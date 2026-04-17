@@ -26,8 +26,10 @@ struct ContentView: View {
     @State private var showingHelp = false
     @State private var showingEQImportError = false
     @State private var eqImportErrorMessage = ""
+    @State private var showingSettingsImportConfirmation = false
     @State private var showingSettingsTransferMessage = false
     @State private var settingsTransferMessage = ""
+    @State private var pendingSettingsImportURL: URL?
     @State private var newPresetName = ""
     @State private var didInitialStartup = false
     @State private var normalizeSpectrumAnalyzer = false
@@ -150,6 +152,18 @@ struct ContentView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(eqImportErrorMessage)
+        }
+        .alert("Import Settings Backup?", isPresented: $showingSettingsImportConfirmation) {
+            Button("Cancel", role: .cancel) {
+                pendingSettingsImportURL = nil
+            }
+            Button("Import", role: .destructive) {
+                guard let sourceURL = pendingSettingsImportURL else { return }
+                performSettingsImport(from: sourceURL)
+                pendingSettingsImportURL = nil
+            }
+        } message: {
+            Text("This replaces current app settings, custom presets, and device profiles.")
         }
         .alert("Settings Transfer", isPresented: $showingSettingsTransferMessage) {
             Button("OK", role: .cancel) {}
@@ -1442,6 +1456,11 @@ struct ContentView: View {
 
         guard openPanel.runModal() == .OK, let sourceURL = openPanel.url else { return }
 
+        pendingSettingsImportURL = sourceURL
+        showingSettingsImportConfirmation = true
+    }
+
+    private func performSettingsImport(from sourceURL: URL) {
         do {
             let bundle = try SettingsTransfer.read(from: sourceURL)
 
