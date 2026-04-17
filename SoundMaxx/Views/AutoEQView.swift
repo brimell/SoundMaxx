@@ -129,6 +129,17 @@ struct AutoEQView: View {
 
             Spacer()
 
+                Button {
+                    autoEQManager.search(query: searchText)
+                    autoEQManager.loadHeadphoneIndexIfNeeded(forceReload: true)
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .disabled(autoEQManager.isLoading)
+                .help("Force refresh the AutoEQ catalog from the network")
+
             Text("\(filteredHeadphones.count) results")
                 .font(.caption2)
                 .foregroundColor(.secondary)

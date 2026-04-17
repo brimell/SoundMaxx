@@ -25,7 +25,7 @@ Project website: [https://brimell.github.io/SoundMaxx/](https://brimell.github.i
 - **HDMI Volume Control** - Software volume slider for HDMI outputs (macOS disables hardware control)
 - **Global Output Switch Shortcut** - Press Control+Option+Command+O to cycle to the next output device instantly
 - **Shortcut Target Selection** - Choose exactly which output devices are included in shortcut cycling
-- **AutoEQ Integration** - Search and apply headphone correction curves from [AutoEQ](https://github.com/jaakkopasanen/AutoEq)
+- **AutoEQ Integration** - Search and apply headphone correction curves from [AutoEQ](https://github.com/jaakkopasanen/AutoEq), including manual catalog refresh
 - **AutoEQ Quick Filters** - Narrow catalog by headphone type and favorites for faster selection
 - **AutoEQ Text Import** - Import AutoEQ `ParametricEQ.txt` or `GraphicEQ.txt` files directly
 - **Quick Help Popover** - Built-in in-app guidance for setup and controls
