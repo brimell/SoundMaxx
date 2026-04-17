@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import CoreAudio
 import AudioToolbox
+import Accelerate
 
 class AudioEngine: ObservableObject {
     private var inputUnit: AudioUnit?
@@ -36,6 +37,7 @@ class AudioEngine: ObservableObject {
     @Published private(set) var outputLimiterEngaged: Bool = false
     @Published private(set) var outputPeakSample: Float = 0.0
     @Published private(set) var outputStageClippingDetected: Bool = false
+    @Published private(set) var spectrumBins: [Float] = Array(repeating: 0.0, count: SpectrumAnalyzer.defaultBarCount)
 
     // Backward-compatible alias for existing UI usage.
     @Published private(set) var clippingDetected: Bool = false
@@ -55,6 +57,9 @@ class AudioEngine: ObservableObject {
     private var lastEQMeterClippingDetected = false
     private var lastLimiterEngagedState = false
     private var lastOutputMeterClippingDetected = false
+    private var spectrumAnalyzer: SpectrumAnalyzer?
+    private let spectrumPublishInterval: TimeInterval = 1.0 / 30.0
+    private var lastSpectrumPublishTime: TimeInterval = 0
 
     // Device info
     @Published var outputDeviceNeedsVolumeControl = false
@@ -237,6 +242,7 @@ class AudioEngine: ObservableObject {
             )
 
             processingSampleRate = workingSampleRate
+            setupSpectrumAnalyzer(sampleRate: Float(workingSampleRate))
 
             // Initialize ring buffer
             ringBuffer = RingBuffer(channels: 2, bytesPerFrame: 8, capacityFrames: bufferSize * 4)
@@ -545,9 +551,11 @@ class AudioEngine: ObservableObject {
         }
         parametricEQ = nil
         outputLimiter = nil
+        spectrumAnalyzer = nil
         ringBuffer = nil
         releaseInputRenderBuffers()
         resetClippingMeterState()
+        resetSpectrumState()
     }
 
     // Called when input data is available from BlackHole
@@ -668,6 +676,8 @@ class AudioEngine: ObservableObject {
             }
         }
 
+        processSpectrum(bufferList: bufferListPtr, frameCount: Int(inNumberFrames))
+
         publishStagePeaks(
             eqStagePeakSample: eqStagePeak,
             outputStagePeakSample: outputStagePeak,
@@ -780,6 +790,43 @@ class AudioEngine: ObservableObject {
         }
     }
 
+    private func setupSpectrumAnalyzer(sampleRate: Float) {
+        spectrumAnalyzer = SpectrumAnalyzer(sampleRate: sampleRate)
+        lastSpectrumPublishTime = 0
+        DispatchQueue.main.async { [weak self] in
+            self?.spectrumBins = Array(repeating: 0.0, count: SpectrumAnalyzer.defaultBarCount)
+        }
+    }
+
+    private func processSpectrum(bufferList: UnsafeMutableAudioBufferListPointer, frameCount: Int) {
+        guard let analyzer = spectrumAnalyzer else { return }
+
+        let left = bufferList.indices.contains(0)
+            ? bufferList[0].mData?.assumingMemoryBound(to: Float.self)
+            : nil
+        let right = bufferList.indices.contains(1)
+            ? bufferList[1].mData?.assumingMemoryBound(to: Float.self)
+            : nil
+
+        guard analyzer.process(left: left, right: right, frameCount: frameCount) else { return }
+
+        let now = Date().timeIntervalSinceReferenceDate
+        guard now - lastSpectrumPublishTime >= spectrumPublishInterval else { return }
+
+        lastSpectrumPublishTime = now
+        let bars = analyzer.currentBars
+        DispatchQueue.main.async { [weak self] in
+            self?.spectrumBins = bars
+        }
+    }
+
+    private func resetSpectrumState() {
+        lastSpectrumPublishTime = 0
+        DispatchQueue.main.async { [weak self] in
+            self?.spectrumBins = Array(repeating: 0.0, count: SpectrumAnalyzer.defaultBarCount)
+        }
+    }
+
     private func resetClippingMeterState() {
         eqClippingHoldUntilTime = 0
         limiterEngagedHoldUntilTime = 0
@@ -861,6 +908,188 @@ class RingBuffer {
 
         readIndex = (readIndex + toRead) % capacityFrames
         return toRead
+    }
+}
+
+final class SpectrumAnalyzer {
+    static let defaultBarCount = 64
+
+    private let sampleRate: Float
+    private let fftSize: Int
+    private let hopSize: Int
+    private let barCount: Int
+    private let log2n: vDSP_Length
+    private let fftSetup: FFTSetup
+    private let minFrequency: Float = 20.0
+    private let analysisMaxFrequency: Float
+
+    private var circularBuffer: [Float]
+    private var circularWriteIndex = 0
+    private var totalSamplesSeen = 0
+    private var samplesSinceLastFFT = 0
+
+    private var fftInput: [Float]
+    private var window: [Float]
+    private var splitReal: [Float]
+    private var splitImag: [Float]
+    private var magnitudes: [Float]
+    private var binToBar: [Int]
+    private var workingBars: [Float]
+
+    private(set) var currentBars: [Float]
+
+    init(sampleRate: Float, fftSize: Int = 2048, hopSize: Int = 1024, barCount: Int = SpectrumAnalyzer.defaultBarCount) {
+        precondition(fftSize > 0 && (fftSize & (fftSize - 1)) == 0, "FFT size must be a power of two")
+        precondition(hopSize > 0 && hopSize <= fftSize, "Hop size must be between 1 and fftSize")
+        precondition(barCount > 0, "Bar count must be greater than zero")
+
+        self.sampleRate = sampleRate
+        self.fftSize = fftSize
+        self.hopSize = hopSize
+        self.barCount = barCount
+        self.analysisMaxFrequency = min(20_000.0, sampleRate * 0.5)
+
+        let log2Value = Int(log2(Double(fftSize)))
+        self.log2n = vDSP_Length(log2Value)
+
+        guard let setup = vDSP_create_fftsetup(self.log2n, FFTRadix(kFFTRadix2)) else {
+            fatalError("Failed to create FFT setup")
+        }
+        self.fftSetup = setup
+
+        self.circularBuffer = Array(repeating: 0.0, count: fftSize)
+        self.fftInput = Array(repeating: 0.0, count: fftSize)
+        self.window = Array(repeating: 0.0, count: fftSize)
+        self.splitReal = Array(repeating: 0.0, count: fftSize / 2)
+        self.splitImag = Array(repeating: 0.0, count: fftSize / 2)
+        self.magnitudes = Array(repeating: 0.0, count: fftSize / 2)
+        self.binToBar = Array(repeating: -1, count: fftSize / 2)
+        self.workingBars = Array(repeating: 0.0, count: barCount)
+        self.currentBars = Array(repeating: 0.0, count: barCount)
+
+        vDSP_hann_window(&window, vDSP_Length(fftSize), Int32(vDSP_HANN_NORM))
+        buildBinToBarMap()
+    }
+
+    deinit {
+        vDSP_destroy_fftsetup(fftSetup)
+    }
+
+    func process(left: UnsafePointer<Float>?, right: UnsafePointer<Float>?, frameCount: Int) -> Bool {
+        guard frameCount > 0 else { return false }
+
+        for i in 0..<frameCount {
+            let leftSample = left?[i] ?? 0.0
+            let rightSample = right?[i] ?? leftSample
+            circularBuffer[circularWriteIndex] = 0.5 * (leftSample + rightSample)
+
+            circularWriteIndex += 1
+            if circularWriteIndex >= fftSize {
+                circularWriteIndex = 0
+            }
+        }
+
+        totalSamplesSeen += frameCount
+        samplesSinceLastFFT += frameCount
+
+        var generatedFrame = false
+        while totalSamplesSeen >= fftSize && samplesSinceLastFFT >= hopSize {
+            analyzeLatestFrame()
+            samplesSinceLastFFT -= hopSize
+            generatedFrame = true
+        }
+
+        return generatedFrame
+    }
+
+    private func buildBinToBarMap() {
+        guard analysisMaxFrequency > minFrequency else { return }
+
+        let minLog = log10f(minFrequency)
+        let maxLog = log10f(analysisMaxFrequency)
+        let logRange = max(maxLog - minLog, 0.0001)
+
+        for bin in 1..<binToBar.count {
+            let frequency = (Float(bin) * sampleRate) / Float(fftSize)
+            guard frequency >= minFrequency && frequency <= analysisMaxFrequency else {
+                continue
+            }
+
+            let normalized = (log10f(frequency) - minLog) / logRange
+            let clamped = max(0.0, min(1.0, normalized))
+            let barIndex = min(barCount - 1, Int(clamped * Float(barCount - 1)))
+            binToBar[bin] = barIndex
+        }
+    }
+
+    private func analyzeLatestFrame() {
+        var sourceIndex = circularWriteIndex
+        for i in 0..<fftSize {
+            fftInput[i] = circularBuffer[sourceIndex]
+            sourceIndex += 1
+            if sourceIndex >= fftSize {
+                sourceIndex = 0
+            }
+        }
+
+        vDSP_vmul(fftInput, 1, window, 1, &fftInput, 1, vDSP_Length(fftSize))
+
+        fftInput.withUnsafeMutableBufferPointer { inputPtr in
+            splitReal.withUnsafeMutableBufferPointer { realPtr in
+                splitImag.withUnsafeMutableBufferPointer { imagPtr in
+                    guard let inputBase = inputPtr.baseAddress,
+                          let realBase = realPtr.baseAddress,
+                          let imagBase = imagPtr.baseAddress else {
+                        return
+                    }
+
+                    inputBase.withMemoryRebound(to: DSPComplex.self, capacity: fftSize / 2) { complexPtr in
+                        var split = DSPSplitComplex(realp: realBase, imagp: imagBase)
+                        vDSP_ctoz(complexPtr, 2, &split, 1, vDSP_Length(fftSize / 2))
+                        vDSP_fft_zrip(fftSetup, &split, 1, log2n, FFTDirection(FFT_FORWARD))
+
+                        var scale: Float = 1.0 / Float(fftSize)
+                        vDSP_vsmul(split.realp, 1, &scale, split.realp, 1, vDSP_Length(fftSize / 2))
+                        vDSP_vsmul(split.imagp, 1, &scale, split.imagp, 1, vDSP_Length(fftSize / 2))
+                        vDSP_zvabs(&split, 1, &magnitudes, 1, vDSP_Length(fftSize / 2))
+                    }
+                }
+            }
+        }
+
+        if !magnitudes.isEmpty {
+            magnitudes[0] = 0
+        }
+
+        for i in 0..<workingBars.count {
+            workingBars[i] = 0
+        }
+
+        for bin in 1..<magnitudes.count {
+            let barIndex = binToBar[bin]
+            guard barIndex >= 0 else { continue }
+
+            let magnitude = magnitudes[bin]
+            if magnitude > workingBars[barIndex] {
+                workingBars[barIndex] = magnitude
+            }
+        }
+
+        let floorDB: Float = -90.0
+        let ceilingDB: Float = 0.0
+        let risingSmoothing: Float = 0.55
+        let fallingSmoothing: Float = 0.14
+        let range = max(ceilingDB - floorDB, 0.0001)
+
+        for i in 0..<barCount {
+            let amplitude = max(workingBars[i], 1e-9)
+            let db = 20.0 * log10f(amplitude)
+            let normalized = max(0.0, min(1.0, (db - floorDB) / range))
+
+            let previous = currentBars[i]
+            let smoothing = normalized > previous ? risingSmoothing : fallingSmoothing
+            currentBars[i] = previous + ((normalized - previous) * smoothing)
+        }
     }
 }
 

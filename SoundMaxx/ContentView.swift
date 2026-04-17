@@ -51,6 +51,8 @@ struct ContentView: View {
 
             responseGraph
 
+            spectrumGraph
+
             eqSliders
 
             preGainControl
@@ -308,6 +310,16 @@ struct ContentView: View {
         )
         .frame(height: isCompactLayout ? 120 : 154)
         .help("Actual resulting EQ response across the frequency spectrum")
+    }
+
+    private var spectrumGraph: some View {
+        SpectrumAnalyzerView(
+            bars: audioEngine.spectrumBins,
+            isRunning: audioEngine.isRunning,
+            sampleRate: audioEngine.processingSampleRate
+        )
+        .frame(height: isCompactLayout ? 94 : 118)
+        .help("Real-time output spectrum after EQ, volume, and limiter.")
     }
 
     private var eqSliders: some View {
@@ -1384,6 +1396,117 @@ private struct EQResponseGraphView: View {
             return "+\(Int(gain))"
         }
         return "\(Int(gain))"
+    }
+}
+
+private struct SpectrumAnalyzerView: View {
+    let bars: [Float]
+    let isRunning: Bool
+    let sampleRate: Double
+
+    private let minFrequency: Float = 20.0
+    private let frequencyTicks: [Float] = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+    private let labeledFrequencyTicks: [Float] = [31.5, 125, 500, 2000, 8000, 16000]
+
+    private var maxFrequency: Float {
+        max(200.0, min(Float(sampleRate * 0.5), 20_000.0))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Spectrum")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Text(isRunning ? "Live" : "Idle")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(isRunning ? .green : .secondary)
+            }
+
+            GeometryReader { proxy in
+                let width = proxy.size.width
+                let height = proxy.size.height
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.08))
+
+                    ForEach(frequencyTicks.filter { $0 <= maxFrequency }, id: \.self) { tick in
+                        Path { path in
+                            let x = xPosition(for: tick, in: width)
+                            path.move(to: CGPoint(x: x, y: 0))
+                            path.addLine(to: CGPoint(x: x, y: height))
+                        }
+                        .stroke(Color.secondary.opacity(0.12), lineWidth: 0.8)
+                    }
+
+                    HStack(alignment: .bottom, spacing: 2) {
+                        ForEach(Array(bars.enumerated()), id: \.offset) { _, value in
+                            let normalized = max(0.0, min(1.0, value))
+                            let barHeight = max(1.0, CGFloat(normalized) * (height - 16.0))
+
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.cyan.opacity(0.85),
+                                            Color.orange.opacity(0.9)
+                                        ],
+                                        startPoint: .bottom,
+                                        endPoint: .top
+                                    )
+                                )
+                                .opacity(0.3 + (Double(normalized) * 0.7))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: barHeight)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 12)
+                    .padding(.top, 4)
+
+                    if !isRunning {
+                        Text("Start audio to view spectrum")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+
+                    ForEach(labeledFrequencyTicks.filter { $0 <= maxFrequency }, id: \.self) { tick in
+                        Text(formatFrequency(tick))
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .position(
+                                x: xPosition(for: tick, in: width),
+                                y: height - 5
+                            )
+                    }
+                }
+            }
+        }
+    }
+
+    private func xPosition(for frequency: Float, in width: CGFloat) -> CGFloat {
+        let clamped = max(minFrequency, min(maxFrequency, frequency))
+        let minLog = log10f(minFrequency)
+        let maxLog = log10f(maxFrequency)
+        let valueLog = log10f(clamped)
+        let normalized = (valueLog - minLog) / max(maxLog - minLog, 0.0001)
+        return CGFloat(normalized) * width
+    }
+
+    private func formatFrequency(_ frequency: Float) -> String {
+        if frequency >= 1000 {
+            let value = frequency / 1000.0
+            if value >= 10 {
+                return "\(Int(value))k"
+            }
+            return String(format: "%.1fk", value)
+        }
+
+        return String(format: "%.0f", frequency)
     }
 }
 
