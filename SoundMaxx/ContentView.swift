@@ -507,27 +507,28 @@ struct ContentView: View {
                 Spacer()
             }
 
-            HStack {
-                Text("Ceiling")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(width: 55, alignment: .leading)
+            if eqModel.limiterEnabled {
+                HStack {
+                    Text("Ceiling")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 55, alignment: .leading)
 
-                Slider(
-                    value: Binding(
-                        get: { Double(eqModel.limiterCeilingDB) },
-                        set: { eqModel.setLimiterCeilingDB(Float($0)) }
-                    ),
-                    in: -6.0 ... -0.1,
-                    step: 0.1
-                )
-                .disabled(!eqModel.limiterEnabled)
-                .help("Limiter ceiling in dBFS.")
+                    Slider(
+                        value: Binding(
+                            get: { Double(eqModel.limiterCeilingDB) },
+                            set: { eqModel.setLimiterCeilingDB(Float($0)) }
+                        ),
+                        in: -6.0 ... -0.1,
+                        step: 0.1
+                    )
+                    .help("Limiter ceiling in dBFS.")
 
-                Text(String(format: "%.1f dBFS", eqModel.limiterCeilingDB))
-                    .font(.caption2.monospacedDigit())
-                    .foregroundColor(.secondary)
-                    .frame(width: 62, alignment: .trailing)
+                    Text(String(format: "%.1f dBFS", eqModel.limiterCeilingDB))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(.secondary)
+                        .frame(width: 62, alignment: .trailing)
+                }
             }
 
             HStack(spacing: 8) {
