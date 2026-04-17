@@ -120,8 +120,8 @@ struct DeviceInfo {
             mElement: kAudioObjectPropertyElementMain
         )
 
-        var uid: CFString?
-        var size = UInt32(MemoryLayout<CFString?>.size)
+        var unmanagedUID: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
 
         let status = AudioObjectGetPropertyData(
             deviceID,
@@ -129,10 +129,10 @@ struct DeviceInfo {
             0,
             nil,
             &size,
-            &uid
+            &unmanagedUID
         )
 
-        guard status == noErr, let deviceUID = uid else { return nil }
+        guard status == noErr, let deviceUID = unmanagedUID?.takeRetainedValue() else { return nil }
         return deviceUID as String
     }
 

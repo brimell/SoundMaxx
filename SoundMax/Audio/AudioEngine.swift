@@ -98,11 +98,11 @@ class AudioEngine: ObservableObject {
             mElement: kAudioObjectPropertyElementMain
         )
 
-        var name: CFString?
-        var size = UInt32(MemoryLayout<CFString?>.size)
+        var unmanagedName: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
 
-        let status = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, &size, &name)
-        guard status == noErr, let deviceName = name else { return nil }
+        let status = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, &size, &unmanagedName)
+        guard status == noErr, let deviceName = unmanagedName?.takeRetainedValue() else { return nil }
         return deviceName as String
     }
 

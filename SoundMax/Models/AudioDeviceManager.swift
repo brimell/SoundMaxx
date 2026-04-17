@@ -75,8 +75,8 @@ class AudioDeviceManager: ObservableObject {
             mElement: kAudioObjectPropertyElementMain
         )
 
-        var name: CFString?
-        var dataSize = UInt32(MemoryLayout<CFString?>.size)
+        var unmanagedName: Unmanaged<CFString>?
+        var dataSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
 
         let status = AudioObjectGetPropertyData(
             deviceID,
@@ -84,10 +84,10 @@ class AudioDeviceManager: ObservableObject {
             0,
             nil,
             &dataSize,
-            &name
+            &unmanagedName
         )
 
-        guard status == noErr, let deviceName = name else { return nil }
+        guard status == noErr, let deviceName = unmanagedName?.takeRetainedValue() else { return nil }
         return deviceName as String
     }
 
