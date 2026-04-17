@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -38,7 +38,7 @@
 		D6A097FC8AA074A9C2DB3A90 /* AudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEngine.swift; sourceTree = "<group>"; };
 		E78ED980AAED8A73537EC45E /* EQSliderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EQSliderView.swift; sourceTree = "<group>"; };
 		F71D1309559DC169C09D7F42 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		F9EACF6F7A3FF42A540BFADB /* SoundMax.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SoundMax.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F9EACF6F7A3FF42A540BFADB /* SoundMaxx.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SoundMaxx.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -60,7 +60,7 @@
 		332CE17EC83C1BAE83AF0544 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F9EACF6F7A3FF42A540BFADB /* SoundMax.app */,
+				F9EACF6F7A3FF42A540BFADB /* SoundMaxx.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -121,8 +121,8 @@
 			name = SoundMax;
 			packageProductDependencies = (
 			);
-			productName = SoundMax;
-			productReference = F9EACF6F7A3FF42A540BFADB /* SoundMax.app */;
+			productName = SoundMaxx;
+			productReference = F9EACF6F7A3FF42A540BFADB /* SoundMaxx.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -132,7 +132,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1500;
+				LastUpgradeCheck = 2620;
 			};
 			buildConfigurationList = C9A80F3E8D167B251085E6A0 /* Build configuration list for PBXProject "SoundMax" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -144,7 +144,6 @@
 			);
 			mainGroup = F9A5552073C5FA8268A3E765;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -194,6 +193,7 @@
 				CODE_SIGN_ENTITLEMENTS = SoundMax/SoundMax.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = SoundMax/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -202,7 +202,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.SoundMax;
-				PRODUCT_NAME = SoundMax;
+				PRODUCT_NAME = SoundMaxx;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 			};
@@ -215,6 +215,7 @@
 				CODE_SIGN_ENTITLEMENTS = SoundMax/SoundMax.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = SoundMax/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -223,7 +224,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.SoundMax;
-				PRODUCT_NAME = SoundMax;
+				PRODUCT_NAME = SoundMaxx;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 			};
@@ -263,9 +264,11 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -279,6 +282,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -319,9 +323,11 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -342,6 +348,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;

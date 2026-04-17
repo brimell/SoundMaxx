@@ -8,15 +8,31 @@ struct DeviceProfile: Codable, Identifiable {
     let deviceUID: String
     let deviceName: String
     var eqBands: [Double]  // 10 bands, -12 to +12
+    var parametricBands: [EQBand]?
     var volume: Float      // 0.0 to 1.0 (for HDMI/software volume)
     var isEQEnabled: Bool
 
-    init(deviceUID: String, deviceName: String, eqBands: [Double] = Array(repeating: 0.0, count: 10), volume: Float = 1.0, isEQEnabled: Bool = true) {
+    init(
+        deviceUID: String,
+        deviceName: String,
+        eqBands: [Double] = Array(repeating: 0.0, count: 10),
+        parametricBands: [EQBand]? = nil,
+        volume: Float = 1.0,
+        isEQEnabled: Bool = true
+    ) {
         self.deviceUID = deviceUID
         self.deviceName = deviceName
         self.eqBands = eqBands
+        self.parametricBands = parametricBands
         self.volume = volume
         self.isEQEnabled = isEQEnabled
+    }
+
+    var effectiveBands: [EQBand] {
+        if let parametricBands, !parametricBands.isEmpty {
+            return parametricBands
+        }
+        return EQBand.tenBand(withGains: eqBands.map { Float($0) })
     }
 }
 
@@ -44,11 +60,19 @@ class DeviceProfileManager: ObservableObject {
         persistProfiles()
     }
 
-    func saveCurrentSettings(for deviceUID: String, deviceName: String, eqBands: [Double], volume: Float, isEQEnabled: Bool) {
+    func saveCurrentSettings(
+        for deviceUID: String,
+        deviceName: String,
+        eqBands: [Double],
+        parametricBands: [EQBand],
+        volume: Float,
+        isEQEnabled: Bool
+    ) {
         let profile = DeviceProfile(
             deviceUID: deviceUID,
             deviceName: deviceName,
             eqBands: eqBands,
+            parametricBands: parametricBands,
             volume: volume,
             isEQEnabled: isEQEnabled
         )

@@ -12,7 +12,7 @@ struct SoundMaxApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("SoundMax", systemImage: "slider.horizontal.3") {
+        MenuBarExtra("SoundMaxx", systemImage: "slider.horizontal.3") {
             ContentView()
                 .environmentObject(audioEngine)
                 .environmentObject(eqModel)

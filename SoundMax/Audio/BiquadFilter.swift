@@ -15,6 +15,7 @@ class BiquadFilter {
     private var y1: [Float] = [0, 0]  // y[n-1] for each channel
     private var y2: [Float] = [0, 0]  // y[n-2] for each channel
 
+    var type: EQFilterType = .peak
     var frequency: Float = 1000
     var gain: Float = 0  // in dB
     var q: Float = 1.0
@@ -22,40 +23,131 @@ class BiquadFilter {
 
     init() {}
 
-    /// Calculate coefficients for a peaking EQ filter
+    func configure(with band: EQBand, sampleRate: Float) {
+        type = band.type
+        frequency = band.frequency
+        gain = band.gain
+        q = band.q
+        self.sampleRate = sampleRate
+        updateCoefficients()
+    }
+
+    /// Calculate coefficients for the configured filter type.
     func updateCoefficients() {
-        let A = powf(10, gain / 40.0)  // amplitude
-        let omega = 2.0 * Float.pi * frequency / sampleRate
+        let limitedSampleRate = max(8000.0, sampleRate)
+        let nyquist = (limitedSampleRate * 0.5) - 1.0
+        let limitedFrequency = max(20.0, min(frequency, nyquist))
+        let limitedQ = max(0.05, q)
+        let limitedGain = max(-24.0, min(24.0, gain))
+
+        let A = powf(10, limitedGain / 40.0)  // amplitude
+        let omega = 2.0 * Float.pi * limitedFrequency / limitedSampleRate
         let sinOmega = sin(omega)
         let cosOmega = cos(omega)
-        let alpha = sinOmega / (2.0 * q)
+        let alpha = sinOmega / (2.0 * limitedQ)
+        let sqrtA = sqrt(A)
 
-        let a0: Float
+        var b0Raw: Float = 1.0
+        var b1Raw: Float = 0.0
+        var b2Raw: Float = 0.0
+        var a0Raw: Float = 1.0
+        var a1Raw: Float = 0.0
+        var a2Raw: Float = 0.0
 
-        if abs(gain) < 0.01 {
-            // Bypass - unity gain
-            b0 = 1.0
-            b1 = 0.0
-            b2 = 0.0
-            a1 = 0.0
-            a2 = 0.0
-            return
+        switch type {
+        case .peak:
+            if abs(limitedGain) < 0.01 {
+                // Bypass - unity gain
+                b0 = 1.0
+                b1 = 0.0
+                b2 = 0.0
+                a1 = 0.0
+                a2 = 0.0
+                return
+            }
+
+            b0Raw = 1.0 + alpha * A
+            b1Raw = -2.0 * cosOmega
+            b2Raw = 1.0 - alpha * A
+            a0Raw = 1.0 + alpha / A
+            a1Raw = -2.0 * cosOmega
+            a2Raw = 1.0 - alpha / A
+
+        case .lowShelf:
+            if abs(limitedGain) < 0.01 {
+                b0 = 1.0
+                b1 = 0.0
+                b2 = 0.0
+                a1 = 0.0
+                a2 = 0.0
+                return
+            }
+
+            b0Raw = A * ((A + 1.0) - (A - 1.0) * cosOmega + 2.0 * sqrtA * alpha)
+            b1Raw = 2.0 * A * ((A - 1.0) - (A + 1.0) * cosOmega)
+            b2Raw = A * ((A + 1.0) - (A - 1.0) * cosOmega - 2.0 * sqrtA * alpha)
+            a0Raw = (A + 1.0) + (A - 1.0) * cosOmega + 2.0 * sqrtA * alpha
+            a1Raw = -2.0 * ((A - 1.0) + (A + 1.0) * cosOmega)
+            a2Raw = (A + 1.0) + (A - 1.0) * cosOmega - 2.0 * sqrtA * alpha
+
+        case .highShelf:
+            if abs(limitedGain) < 0.01 {
+                b0 = 1.0
+                b1 = 0.0
+                b2 = 0.0
+                a1 = 0.0
+                a2 = 0.0
+                return
+            }
+
+            b0Raw = A * ((A + 1.0) + (A - 1.0) * cosOmega + 2.0 * sqrtA * alpha)
+            b1Raw = -2.0 * A * ((A - 1.0) + (A + 1.0) * cosOmega)
+            b2Raw = A * ((A + 1.0) + (A - 1.0) * cosOmega - 2.0 * sqrtA * alpha)
+            a0Raw = (A + 1.0) - (A - 1.0) * cosOmega + 2.0 * sqrtA * alpha
+            a1Raw = 2.0 * ((A - 1.0) - (A + 1.0) * cosOmega)
+            a2Raw = (A + 1.0) - (A - 1.0) * cosOmega - 2.0 * sqrtA * alpha
+
+        case .lowPass:
+            b0Raw = (1.0 - cosOmega) * 0.5
+            b1Raw = 1.0 - cosOmega
+            b2Raw = (1.0 - cosOmega) * 0.5
+            a0Raw = 1.0 + alpha
+            a1Raw = -2.0 * cosOmega
+            a2Raw = 1.0 - alpha
+
+        case .highPass:
+            b0Raw = (1.0 + cosOmega) * 0.5
+            b1Raw = -(1.0 + cosOmega)
+            b2Raw = (1.0 + cosOmega) * 0.5
+            a0Raw = 1.0 + alpha
+            a1Raw = -2.0 * cosOmega
+            a2Raw = 1.0 - alpha
+
+        case .notch:
+            b0Raw = 1.0
+            b1Raw = -2.0 * cosOmega
+            b2Raw = 1.0
+            a0Raw = 1.0 + alpha
+            a1Raw = -2.0 * cosOmega
+            a2Raw = 1.0 - alpha
+
+        case .bandPass:
+            b0Raw = alpha
+            b1Raw = 0.0
+            b2Raw = -alpha
+            a0Raw = 1.0 + alpha
+            a1Raw = -2.0 * cosOmega
+            a2Raw = 1.0 - alpha
         }
 
-        // Peaking EQ coefficients
-        let b0_raw = 1.0 + alpha * A
-        let b1_raw = -2.0 * cosOmega
-        let b2_raw = 1.0 - alpha * A
-        a0 = 1.0 + alpha / A
-        let a1_raw = -2.0 * cosOmega
-        let a2_raw = 1.0 - alpha / A
+        let safeA0 = abs(a0Raw) < 1e-8 ? 1.0 : a0Raw
 
         // Normalize by a0
-        b0 = b0_raw / a0
-        b1 = b1_raw / a0
-        b2 = b2_raw / a0
-        a1 = a1_raw / a0
-        a2 = a2_raw / a0
+        b0 = b0Raw / safeA0
+        b1 = b1Raw / safeA0
+        b2 = b2Raw / safeA0
+        a1 = a1Raw / safeA0
+        a2 = a2Raw / safeA0
     }
 
     /// Process a single sample for a given channel
@@ -83,51 +175,52 @@ class BiquadFilter {
     }
 }
 
-/// 10-band parametric EQ using biquad filters
+/// Multi-band parametric EQ using biquad filters
 class ParametricEQ {
-    static let frequencies: [Float] = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
-
     private var filters: [BiquadFilter] = []
+    private var activeBands: [EQBand] = []
+    private var pendingBands: [EQBand]?
+    private let updateLock = NSLock()
     private var sampleRate: Float = 48000
     var bypass: Bool = false
 
-    init(sampleRate: Double) {
+    init(sampleRate: Double, bands: [EQBand] = EQBand.defaultTenBand) {
         self.sampleRate = Float(sampleRate)
+        applyBandsImmediately(bands)
+    }
 
-        // Create a biquad filter for each frequency band
-        for freq in Self.frequencies {
-            let filter = BiquadFilter()
-            filter.frequency = freq
-            filter.gain = 0
-            filter.q = 1.4  // Good Q for 10-band EQ
-            filter.sampleRate = self.sampleRate
-            filter.updateCoefficients()
-            filters.append(filter)
-        }
+    func setBands(_ bands: [EQBand]) {
+        updateLock.lock()
+        pendingBands = bands
+        updateLock.unlock()
     }
 
     func setGain(band: Int, gain: Float) {
-        guard band >= 0 && band < 10 else { return }
-        filters[band].gain = gain
-        filters[band].updateCoefficients()
+        guard activeBands.indices.contains(band) else { return }
+        var updated = activeBands
+        updated[band].gain = gain
+        setBands(updated)
     }
 
     func setAllGains(_ gains: [Float]) {
-        for (index, gain) in gains.enumerated() where index < 10 {
-            filters[index].gain = gain
-            filters[index].updateCoefficients()
+        var updated = activeBands
+        for index in updated.indices where index < gains.count {
+            updated[index].gain = gains[index]
         }
+        setBands(updated)
     }
 
     /// Process audio buffer in place
     func process(buffer: UnsafeMutablePointer<Float>, frameCount: Int, channel: Int) {
         guard !bypass else { return }
 
+        applyPendingBandsIfNeeded()
+
         for frame in 0..<frameCount {
             var sample = buffer[frame]
 
-            // Apply each band's filter in series
-            for filter in filters {
+            // Apply each enabled filter in series.
+            for (filter, band) in zip(filters, activeBands) where band.isEnabled {
                 sample = filter.process(sample: sample, channel: channel)
             }
 
@@ -138,6 +231,33 @@ class ParametricEQ {
     func reset() {
         for filter in filters {
             filter.reset()
+        }
+    }
+
+    private func applyPendingBandsIfNeeded() {
+        updateLock.lock()
+        let nextBands = pendingBands
+        pendingBands = nil
+        updateLock.unlock()
+
+        guard let nextBands else { return }
+        applyBandsImmediately(nextBands)
+    }
+
+    private func applyBandsImmediately(_ bands: [EQBand]) {
+        let normalizedBands = bands.isEmpty ? EQBand.defaultTenBand : bands
+
+        if filters.count != normalizedBands.count {
+            filters = normalizedBands.map { _ in BiquadFilter() }
+            for filter in filters {
+                filter.reset()
+            }
+        }
+
+        activeBands = normalizedBands
+
+        for index in activeBands.indices {
+            filters[index].configure(with: activeBands[index], sampleRate: sampleRate)
         }
     }
 }

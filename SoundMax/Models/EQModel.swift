@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 class EQModel: ObservableObject {
-    @Published var bands: [Float] = Array(repeating: 0, count: 10)
+    @Published var parametricBands: [EQBand] = EQBand.defaultTenBand
     @Published var isEnabled: Bool = true
     @Published var volume: Float = 1.0
     @Published var selectedBuiltInPreset: BuiltInPreset? = .flat
@@ -16,14 +16,19 @@ class EQModel: ObservableObject {
 
     static let frequencyLabels = ["32", "64", "125", "250", "500", "1K", "2K", "4K", "8K", "16K"]
 
+    var legacyGains: [Float] {
+        parametricBands.map { $0.gain }
+    }
+
     private var cancellables = Set<AnyCancellable>()
     private let profileManager = DeviceProfileManager.shared
     private var isLoadingProfile = false
+    private let parametricBandsKey = "eq_parametric_bands"
 
     init() {
         loadSettings()
 
-        $bands
+        $parametricBands
             .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
             .sink { [weak self] _ in
                 self?.saveSettings()
@@ -64,11 +69,12 @@ class EQModel: ObservableObject {
     func saveCurrentAsDeviceProfile() {
         guard let uid = currentDeviceUID, let name = currentDeviceName else { return }
 
-        let bandsAsDouble = bands.map { Double($0) }
+        let bandsAsDouble = legacyGains.map { Double($0) }
         profileManager.saveCurrentSettings(
             for: uid,
             deviceName: name,
             eqBands: bandsAsDouble,
+            parametricBands: parametricBands,
             volume: volume,
             isEQEnabled: isEnabled
         )
@@ -83,7 +89,7 @@ class EQModel: ObservableObject {
 
     private func loadFromProfile(_ profile: DeviceProfile) {
         isLoadingProfile = true
-        bands = profile.eqBands.map { Float($0) }
+        parametricBands = profile.effectiveBands
         volume = profile.volume
         isEnabled = profile.isEQEnabled
         clearPresetSelection()
@@ -97,11 +103,12 @@ class EQModel: ObservableObject {
               let uid = currentDeviceUID,
               let name = currentDeviceName else { return }
 
-        let bandsAsDouble = bands.map { Double($0) }
+        let bandsAsDouble = legacyGains.map { Double($0) }
         profileManager.saveCurrentSettings(
             for: uid,
             deviceName: name,
             eqBands: bandsAsDouble,
+            parametricBands: parametricBands,
             volume: volume,
             isEQEnabled: isEnabled
         )
@@ -110,13 +117,13 @@ class EQModel: ObservableObject {
     func applyBuiltInPreset(_ preset: BuiltInPreset) {
         selectedBuiltInPreset = preset
         selectedCustomPreset = nil
-        bands = preset.values
+        parametricBands = preset.bands
     }
 
     func applyCustomPreset(_ preset: CustomPreset) {
         selectedCustomPreset = preset
         selectedBuiltInPreset = nil
-        bands = preset.values
+        parametricBands = preset.effectiveBands
     }
 
     func reset() {
@@ -128,8 +135,41 @@ class EQModel: ObservableObject {
         selectedCustomPreset = nil
     }
 
+    func setBandGain(index: Int, gain: Float) {
+        guard parametricBands.indices.contains(index) else { return }
+        parametricBands[index].gain = gain
+        clearPresetSelection()
+    }
+
+    func setBandFrequency(index: Int, frequency: Float) {
+        guard parametricBands.indices.contains(index) else { return }
+        parametricBands[index].frequency = frequency
+        clearPresetSelection()
+    }
+
+    func setBandQ(index: Int, q: Float) {
+        guard parametricBands.indices.contains(index) else { return }
+        parametricBands[index].q = q
+        clearPresetSelection()
+    }
+
+    func setBandType(index: Int, type: EQFilterType) {
+        guard parametricBands.indices.contains(index) else { return }
+        parametricBands[index].type = type
+        clearPresetSelection()
+    }
+
+    func setBandEnabled(index: Int, isEnabled: Bool) {
+        guard parametricBands.indices.contains(index) else { return }
+        parametricBands[index].isEnabled = isEnabled
+        clearPresetSelection()
+    }
+
     private func saveSettings() {
-        UserDefaults.standard.set(bands, forKey: "eq_bands")
+        UserDefaults.standard.set(legacyGains, forKey: "eq_bands")
+        if let encoded = try? JSONEncoder().encode(parametricBands) {
+            UserDefaults.standard.set(encoded, forKey: parametricBandsKey)
+        }
         UserDefaults.standard.set(isEnabled, forKey: "eq_enabled")
         if let preset = selectedBuiltInPreset {
             UserDefaults.standard.set(preset.rawValue, forKey: "eq_builtin_preset")
@@ -141,8 +181,12 @@ class EQModel: ObservableObject {
     }
 
     private func loadSettings() {
-        if let savedBands = UserDefaults.standard.array(forKey: "eq_bands") as? [Float] {
-            bands = savedBands
+        if let parametricData = UserDefaults.standard.data(forKey: parametricBandsKey),
+           let decoded = try? JSONDecoder().decode([EQBand].self, from: parametricData),
+           !decoded.isEmpty {
+            parametricBands = decoded
+        } else if let savedBands = UserDefaults.standard.array(forKey: "eq_bands") as? [NSNumber] {
+            parametricBands = EQBand.tenBand(withGains: savedBands.map { $0.floatValue })
         }
         isEnabled = UserDefaults.standard.object(forKey: "eq_enabled") as? Bool ?? true
 

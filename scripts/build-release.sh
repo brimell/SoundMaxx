@@ -1,16 +1,16 @@
 #!/bin/bash
 
-# Build Release script for SoundMax
+# Build Release script for SoundMaxx
 # Creates a DMG installer for distribution
 
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_NAME="SoundMax"
-DMG_NAME="SoundMax-Installer"
+APP_NAME="SoundMaxx"
+DMG_NAME="SoundMaxx-Installer"
 
-echo "=== Building SoundMax Release ==="
+echo "=== Building SoundMaxx Release ==="
 
 # Clean previous builds
 rm -rf "$BUILD_DIR"

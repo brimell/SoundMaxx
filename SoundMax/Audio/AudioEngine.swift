@@ -9,6 +9,8 @@ class AudioEngine: ObservableObject {
 
     private var ringBuffer: RingBuffer?
     private let bufferSize: UInt32 = 4096
+    private var currentBands: [EQBand] = EQBand.defaultTenBand
+    private var currentBypassState = false
 
     @Published var isRunning = false
     @Published var selectedInputDeviceID: AudioDeviceID?
@@ -26,7 +28,7 @@ class AudioEngine: ObservableObject {
     // Callback for device changes
     var onOutputDeviceChanged: ((AudioDeviceID, String, String) -> Void)?
 
-    static let bandFrequencies: [Float] = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+    static let bandFrequencies: [Float] = EQBand.defaultFrequencies
 
     init() {}
 
@@ -35,14 +37,25 @@ class AudioEngine: ObservableObject {
     }
 
     func setGain(forBand band: Int, gain: Float) {
+        guard currentBands.indices.contains(band) else { return }
+        currentBands[band].gain = gain
         parametricEQ?.setGain(band: band, gain: gain)
     }
 
+    func setBands(_ bands: [EQBand]) {
+        currentBands = bands.isEmpty ? EQBand.defaultTenBand : bands
+        parametricEQ?.setBands(currentBands)
+    }
+
     func setAllGains(_ gains: [Float]) {
+        for index in currentBands.indices where index < gains.count {
+            currentBands[index].gain = gains[index]
+        }
         parametricEQ?.setAllGains(gains)
     }
 
     func setBypass(_ bypass: Bool) {
+        currentBypassState = bypass
         parametricEQ?.bypass = bypass
     }
 
@@ -154,7 +167,8 @@ class AudioEngine: ObservableObject {
             outputUnit = try createOutputUnit(deviceID: outputDeviceID, format: &streamFormat)
 
             // Create parametric EQ
-            parametricEQ = ParametricEQ(sampleRate: workingSampleRate)
+            parametricEQ = ParametricEQ(sampleRate: workingSampleRate, bands: currentBands)
+            parametricEQ?.bypass = currentBypassState
 
             // Start units
             var status = AudioOutputUnitStart(inputUnit!)

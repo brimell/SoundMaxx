@@ -21,6 +21,6 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>SoundMax needs audio input access to capture audio from BlackHole for EQ processing.</string>
+	<string>SoundMaxx needs audio input access to capture audio from BlackHole for EQ processing.</string>
 </dict>
 </plist>
