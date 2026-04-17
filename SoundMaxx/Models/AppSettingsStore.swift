@@ -18,6 +18,7 @@ struct AppSettings: Codable {
     var selectedInputDeviceID: Int32? = nil
     var selectedOutputDeviceID: Int32? = nil
     var shortcutOutputDeviceUIDs: [String]? = nil
+    var normalizeSpectrumAnalyzer: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case parametricBands
@@ -35,6 +36,7 @@ struct AppSettings: Codable {
         case selectedInputDeviceID
         case selectedOutputDeviceID
         case shortcutOutputDeviceUIDs
+        case normalizeSpectrumAnalyzer
     }
 
     init() {}
@@ -57,6 +59,7 @@ struct AppSettings: Codable {
         selectedInputDeviceID = try container.decodeIfPresent(Int32.self, forKey: .selectedInputDeviceID)
         selectedOutputDeviceID = try container.decodeIfPresent(Int32.self, forKey: .selectedOutputDeviceID)
         shortcutOutputDeviceUIDs = try container.decodeIfPresent([String].self, forKey: .shortcutOutputDeviceUIDs)
+        normalizeSpectrumAnalyzer = try container.decodeIfPresent(Bool.self, forKey: .normalizeSpectrumAnalyzer) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -77,6 +80,7 @@ struct AppSettings: Codable {
         try container.encode(selectedInputDeviceID, forKey: .selectedInputDeviceID)
         try container.encode(selectedOutputDeviceID, forKey: .selectedOutputDeviceID)
         try container.encode(shortcutOutputDeviceUIDs, forKey: .shortcutOutputDeviceUIDs)
+        try container.encode(normalizeSpectrumAnalyzer, forKey: .normalizeSpectrumAnalyzer)
     }
 }
 

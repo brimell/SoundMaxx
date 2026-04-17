@@ -27,6 +27,7 @@ struct ContentView: View {
     @State private var eqImportErrorMessage = ""
     @State private var newPresetName = ""
     @State private var didInitialStartup = false
+    @State private var normalizeSpectrumAnalyzer = false
     @StateObject private var launchAtLogin = LaunchAtLogin()
     private let settingsStore = AppSettingsStore.shared
     private let autoEQManager = AutoEQManager.shared
@@ -86,6 +87,7 @@ struct ContentView: View {
         .font(.system(size: 14))
         .onAppear {
             loadShortcutOutputTargets()
+            loadSpectrumAnalyzerSettings()
             setupDeviceChangeCallback()
             eqModel.resolvePresetSelection(using: presetManager.customPresets)
             syncEQToEngine()
@@ -93,6 +95,9 @@ struct ContentView: View {
                 autoSelectDevicesAndStart()
                 didInitialStartup = true
             }
+        }
+        .onChange(of: normalizeSpectrumAnalyzer) { _ in
+            persistSpectrumAnalyzerSettings()
         }
         .onReceive(audioEngine.$selectedInputDeviceID) { newDeviceID in
             if selectedInputID != newDeviceID {
@@ -320,7 +325,8 @@ struct ContentView: View {
         SpectrumAnalyzerView(
             bars: audioEngine.spectrumBins,
             isRunning: audioEngine.isRunning,
-            sampleRate: audioEngine.processingSampleRate
+            sampleRate: audioEngine.processingSampleRate,
+            isNormalized: $normalizeSpectrumAnalyzer
         )
         .frame(height: isCompactLayout ? 108 : 132)
         .help("Real-time post-EQ spectrum (before output gain, limiter, and final volume).")
@@ -1275,6 +1281,16 @@ struct ContentView: View {
         shortcutOutputDeviceUIDs = settingsStore.load()?.shortcutOutputDeviceUIDs ?? []
     }
 
+    private func loadSpectrumAnalyzerSettings() {
+        normalizeSpectrumAnalyzer = settingsStore.load()?.normalizeSpectrumAnalyzer ?? false
+    }
+
+    private func persistSpectrumAnalyzerSettings() {
+        settingsStore.update { settings in
+            settings.normalizeSpectrumAnalyzer = normalizeSpectrumAnalyzer
+        }
+    }
+
     private func toggleShortcutTarget(for device: AudioDevice) {
         if let index = shortcutOutputDeviceUIDs.firstIndex(of: device.uid) {
             shortcutOutputDeviceUIDs.remove(at: index)
@@ -1526,6 +1542,7 @@ private struct SpectrumAnalyzerView: View {
     let bars: [Float]
     let isRunning: Bool
     let sampleRate: Double
+    @Binding var isNormalized: Bool
 
     private let minFrequency: Float = 20.0
     private let frequencyTicks: [Float] = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
@@ -1538,12 +1555,29 @@ private struct SpectrumAnalyzerView: View {
         max(200.0, min(Float(sampleRate * 0.5), 20_000.0))
     }
 
+    private var displayBars: [Float] {
+        let clampedBars = bars.map { max(0.0, min(1.0, $0)) }
+        guard isNormalized else { return clampedBars }
+
+        guard let peak = clampedBars.max(), peak > 0.001 else {
+            return clampedBars
+        }
+
+        return clampedBars.map { $0 / peak }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("Spectrum")
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.secondary)
+
+                Toggle("Normalize", isOn: $isNormalized)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .font(.caption2)
+                    .help("Scale bars so the strongest active frequency reaches the top.")
 
                 Spacer()
 
@@ -1578,7 +1612,7 @@ private struct SpectrumAnalyzerView: View {
                         .stroke(Color.secondary.opacity(0.12), lineWidth: 0.8)
                     }
 
-                    if bars.count > 1 {
+                    if displayBars.count > 1 {
                         spectrumFillPath(in: CGSize(width: width, height: height))
                             .fill(
                                 LinearGradient(
@@ -1628,15 +1662,15 @@ private struct SpectrumAnalyzerView: View {
 
     private func spectrumPath(in size: CGSize) -> Path {
         var path = Path()
-        guard bars.count > 1 else { return path }
+        guard displayBars.count > 1 else { return path }
 
-        let firstX = xPositionForBar(at: 0, totalBars: bars.count, in: size.width)
-        let firstY = yPosition(for: bars[0], in: size.height)
+        let firstX = xPositionForBar(at: 0, totalBars: displayBars.count, in: size.width)
+        let firstY = yPosition(for: displayBars[0], in: size.height)
         path.move(to: CGPoint(x: firstX, y: firstY))
 
-        for index in 1..<bars.count {
-            let x = xPositionForBar(at: index, totalBars: bars.count, in: size.width)
-            let y = yPosition(for: bars[index], in: size.height)
+        for index in 1..<displayBars.count {
+            let x = xPositionForBar(at: index, totalBars: displayBars.count, in: size.width)
+            let y = yPosition(for: displayBars[index], in: size.height)
             path.addLine(to: CGPoint(x: x, y: y))
         }
 
@@ -1645,19 +1679,19 @@ private struct SpectrumAnalyzerView: View {
 
     private func spectrumFillPath(in size: CGSize) -> Path {
         var path = Path()
-        guard bars.count > 1 else { return path }
+        guard displayBars.count > 1 else { return path }
 
         let baseline = yPosition(for: 0.0, in: size.height)
-        let startX = xPositionForBar(at: 0, totalBars: bars.count, in: size.width)
+        let startX = xPositionForBar(at: 0, totalBars: displayBars.count, in: size.width)
         path.move(to: CGPoint(x: startX, y: baseline))
 
-        for index in 0..<bars.count {
-            let x = xPositionForBar(at: index, totalBars: bars.count, in: size.width)
-            let y = yPosition(for: bars[index], in: size.height)
+        for index in 0..<displayBars.count {
+            let x = xPositionForBar(at: index, totalBars: displayBars.count, in: size.width)
+            let y = yPosition(for: displayBars[index], in: size.height)
             path.addLine(to: CGPoint(x: x, y: y))
         }
 
-        let endX = xPositionForBar(at: bars.count - 1, totalBars: bars.count, in: size.width)
+        let endX = xPositionForBar(at: displayBars.count - 1, totalBars: displayBars.count, in: size.width)
         path.addLine(to: CGPoint(x: endX, y: baseline))
         path.closeSubpath()
         return path
