@@ -26,6 +26,7 @@ Project website: [https://brimell.github.io/SoundMaxx/](https://brimell.github.i
 - **Global Output Switch Shortcut** - Press Control+Option+Command+O to cycle to the next output device instantly
 - **Shortcut Target Selection** - Choose exactly which output devices are included in shortcut cycling
 - **AutoEQ Integration** - Search and apply headphone correction curves from [AutoEQ](https://github.com/jaakkopasanen/AutoEq)
+- **AutoEQ Quick Filters** - Narrow catalog by headphone type and favorites for faster selection
 - **AutoEQ Text Import** - Import AutoEQ `ParametricEQ.txt` or `GraphicEQ.txt` files directly
 - **Quick Help Popover** - Built-in in-app guidance for setup and controls
 - **Menu Bar App** - Always accessible, no dock icon clutter

@@ -7,6 +7,7 @@ struct AutoEQView: View {
 
     @State private var searchText = ""
     @State private var showFavoritesOnly = false
+    @State private var selectedTypeFilter: String = "all"
     @State private var selectedHeadphone: AutoEQHeadphone?
     @FocusState private var isSearchFocused: Bool
 
@@ -109,7 +110,18 @@ struct AutoEQView: View {
     }
 
     private var optionsRow: some View {
-        HStack {
+        VStack(spacing: 6) {
+            Picker("Type", selection: $selectedTypeFilter) {
+                Text("All").tag("all")
+                Text("Over-ear").tag("over-ear")
+                Text("In-ear").tag("in-ear")
+                Text("On-ear").tag("on-ear")
+                Text("Earbud").tag("earbud")
+            }
+            .pickerStyle(.segmented)
+            .help("Filter by headphone type")
+
+            HStack {
             Toggle("Favorites only", isOn: $showFavoritesOnly)
                 .toggleStyle(.switch)
                 .font(.caption)
@@ -120,6 +132,7 @@ struct AutoEQView: View {
             Text("\(filteredHeadphones.count) results")
                 .font(.caption2)
                 .foregroundColor(.secondary)
+            }
         }
     }
 
@@ -152,16 +165,24 @@ struct AutoEQView: View {
     }
 
     private var filteredHeadphones: [AutoEQHeadphone] {
-        guard showFavoritesOnly else {
-            return autoEQManager.searchResults
+        let typeFiltered = autoEQManager.searchResults.filter { headphone in
+            selectedTypeFilter == "all" || headphone.type == selectedTypeFilter
         }
 
-        return autoEQManager.searchResults.filter { autoEQManager.isFavorite($0) }
+        guard showFavoritesOnly else {
+            return typeFiltered
+        }
+
+        return typeFiltered.filter { autoEQManager.isFavorite($0) }
     }
 
     private var emptyStateHint: String {
         if showFavoritesOnly {
             return "Star headphones in the list to save favorites"
+        }
+
+        if selectedTypeFilter != "all" {
+            return "Try a different type filter or broaden your search"
         }
 
         return searchText.isEmpty ? "Check your network connection and try again" : "Try a different search term"
