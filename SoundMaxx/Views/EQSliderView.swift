@@ -14,7 +14,7 @@ struct EQSliderView: View {
             Text(formattedValue)
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundColor(valueColor)
-                .frame(width: 38)
+                .frame(width: 44)
 
             // Slider track
             ZStack {
@@ -77,19 +77,17 @@ struct EQSliderView: View {
     }
 
     private var formattedValue: String {
-        if abs(value) < 0.5 {
-            return "0"
-        } else if value > 0 {
-            return String(format: "+%.0f", value)
-        } else {
-            return String(format: "%.0f", value)
+        if abs(value) < 0.05 {
+            return "0.0"
         }
+
+        return String(format: "%+.1f", value)
     }
 
     private var valueColor: Color {
-        if value > 0.5 {
+        if value > 0.05 {
             return .orange
-        } else if value < -0.5 {
+        } else if value < -0.05 {
             return .blue
         } else {
             return .secondary
@@ -119,7 +117,8 @@ struct EQSliderView: View {
         let offset = center - locationY
         let normalized = offset / center
         let newValue = Float(normalized) * 12
-        value = min(max(newValue, range.lowerBound), range.upperBound)
+        let steppedValue = (newValue * 10).rounded() / 10
+        value = min(max(steppedValue, range.lowerBound), range.upperBound)
     }
 }
 

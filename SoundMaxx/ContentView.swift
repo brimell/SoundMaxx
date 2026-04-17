@@ -310,7 +310,7 @@ struct ContentView: View {
                         set: { eqModel.setPreGain(gain: Float($0)) }
                     ),
                     in: -24...24,
-                    step: 0.5
+                    step: 0.1
                 )
                 .help("Adjust pre-gain before EQ filters (range: -24 dB to +24 dB)")
 
