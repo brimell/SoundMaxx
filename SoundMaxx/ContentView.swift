@@ -283,7 +283,7 @@ struct ContentView: View {
                 helpRow(icon: "arrow.up.and.down.circle", title: "Headroom + Volume", desc: "Headroom protects the EQ stage, Volume is post-EQ loudness")
                 helpRow(icon: "arrow.left.arrow.right.square", title: "EQ Switch", desc: "Toggle filters on/off for A/B comparison while keeping headroom")
                 helpRow(icon: "waveform.path.ecg", title: "Output Safety", desc: "Separate EQ clipping, limiter activity, and final output status")
-                helpRow(icon: "speaker.wave.2", title: "Volume", desc: "Software volume for HDMI outputs")
+                helpRow(icon: "speaker.wave.2", title: "Volume", desc: "Software volume for HDMI outputs, with optional separate volume per output device")
                 helpRow(icon: "square.and.arrow.down", title: "Presets", desc: "Select or save EQ configurations")
                 helpRow(icon: "headphones", title: "AutoEQ", desc: "Apply headphone correction curves")
                 helpRow(icon: "hifispeaker", title: "Device Profiles", desc: "EQ settings saved per output device")
@@ -513,9 +513,28 @@ struct ContentView: View {
                     .frame(width: 35, alignment: .trailing)
             }
 
-            Text("HDMI Volume (no hardware control)")
-                .font(.caption2)
-                .foregroundColor(.secondary)
+            Toggle(
+                "Separate volume per output device",
+                isOn: Binding(
+                    get: { eqModel.usePerDeviceVolume },
+                    set: { eqModel.setUsePerDeviceVolume($0) }
+                )
+            )
+            .font(.caption)
+            .toggleStyle(.switch)
+            .help("When enabled, each output device keeps its own software volume level.")
+
+            HStack {
+                Text("HDMI Volume (no hardware control)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Text(eqModel.usePerDeviceVolume ? "Separate volume per output device" : "Shared volume across all output devices")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
         }
     }
 
@@ -1025,48 +1044,65 @@ struct ContentView: View {
     }
 
     private var deviceProfileControls: some View {
-        HStack {
-            if eqModel.hasDeviceProfile {
-                HStack(spacing: 4) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .font(.caption)
-                    Text("Profile saved for \(eqModel.currentDeviceName ?? "device")")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+        VStack(spacing: 6) {
+            HStack {
+                if eqModel.hasDeviceProfile {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.caption)
+                        Text("Profile saved for \(eqModel.currentDeviceName ?? "device")")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        eqModel.deleteCurrentDeviceProfile()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundColor(.red)
+                    .help("Delete device profile")
+                } else {
+                    HStack(spacing: 4) {
+                        Image(systemName: "circle.dashed")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                        Text("No profile for \(eqModel.currentDeviceName ?? "device")")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        eqModel.saveCurrentAsDeviceProfile()
+                    } label: {
+                        Text("Save Profile")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Save EQ settings for this device")
                 }
+            }
+
+            HStack {
+                Toggle(
+                    "Auto-save profile changes",
+                    isOn: Binding(
+                        get: { eqModel.autoSaveEnabled },
+                        set: { eqModel.setAutoSaveEnabled($0) }
+                    )
+                )
+                .toggleStyle(.checkbox)
+                .font(.caption)
+                .help("Automatically update this device profile as you tweak EQ settings")
 
                 Spacer()
-
-                Button {
-                    eqModel.deleteCurrentDeviceProfile()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.caption)
-                }
-                .buttonStyle(.borderless)
-                .foregroundColor(.red)
-                .help("Delete device profile")
-            } else {
-                HStack(spacing: 4) {
-                    Image(systemName: "circle.dashed")
-                        .foregroundColor(.secondary)
-                        .font(.caption)
-                    Text("No profile for \(eqModel.currentDeviceName ?? "device")")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Button {
-                    eqModel.saveCurrentAsDeviceProfile()
-                } label: {
-                    Text("Save Profile")
-                        .font(.caption)
-                }
-                .buttonStyle(.borderless)
-                .help("Save EQ settings for this device")
             }
         }
     }

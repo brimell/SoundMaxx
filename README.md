@@ -16,7 +16,7 @@ Project website: [https://brimell.github.io/SoundMaxx/](https://brimell.github.i
 - **Built-in Presets** - Flat, Bass Boost, Treble Boost, Vocal, Rock, Electronic, Acoustic
 - **Custom Presets** - Save and load your own EQ configurations
 - **A/B Compare Snapshots** - Save two temporary EQ states and switch between them instantly
-- **Per-Device Profiles** - Save EQ per output device, auto-restore on switch, and auto-save ongoing tweaks
+- **Per-Device Profiles** - Save EQ per output device, auto-restore on switch, and auto-save ongoing tweaks (with auto-save toggle)
 - **Proper Gain Staging** - Separate headroom (-12 to 0 dB) and post-EQ volume (-40 to +40 dB)
 - **Limiter / Clip Guard** - Final output safety stage with configurable ceiling (default: -1 dBFS)
 - **Auto-Stop EQ Clipping** - Optional safeguard that automatically trims headroom if the EQ stage clips

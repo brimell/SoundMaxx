@@ -33,6 +33,7 @@ class EQModel: ObservableObject {
     @Published var currentDeviceName: String?
     @Published var hasDeviceProfile: Bool = false
     @Published var autoSaveEnabled: Bool = true
+    @Published var usePerDeviceVolume: Bool = true
     @Published private(set) var canUndo: Bool = false
     @Published private(set) var canRedo: Bool = false
     @Published private(set) var hasCompareA: Bool = false
@@ -147,6 +148,18 @@ class EQModel: ObservableObject {
                 self?.autoSaveToDeviceProfile()
             }
             .store(in: &cancellables)
+
+        $usePerDeviceVolume
+            .sink { [weak self] _ in
+                self?.saveSettings()
+            }
+            .store(in: &cancellables)
+
+        $autoSaveEnabled
+            .sink { [weak self] _ in
+                self?.saveSettings()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Device Profile Management
@@ -181,7 +194,7 @@ class EQModel: ObservableObject {
             limiterEnabled: limiterEnabled,
             limiterCeilingDB: limiterCeilingDB,
             autoStopClippingEnabled: autoStopClippingEnabled,
-            volume: volume,
+            volume: profileVolumeForSave(deviceUID: uid),
             isEQEnabled: isEnabled,
             isEQFiltersEnabled: isEQFiltersEnabled,
             selectedBuiltInPresetName: selectedBuiltInPreset?.rawValue,
@@ -204,7 +217,9 @@ class EQModel: ObservableObject {
         limiterEnabled = profile.limiterEnabled
         limiterCeilingDB = profile.limiterCeilingDB
         autoStopClippingEnabled = profile.autoStopClippingEnabled
-        volume = profile.volume
+        if usePerDeviceVolume {
+            volume = profile.volume
+        }
         isEnabled = profile.isEQEnabled
         isEQFiltersEnabled = profile.isEQFiltersEnabled
         applyStoredPresetSelection(
@@ -231,7 +246,7 @@ class EQModel: ObservableObject {
             limiterEnabled: limiterEnabled,
             limiterCeilingDB: limiterCeilingDB,
             autoStopClippingEnabled: autoStopClippingEnabled,
-            volume: volume,
+            volume: profileVolumeForSave(deviceUID: uid),
             isEQEnabled: isEnabled,
             isEQFiltersEnabled: isEQFiltersEnabled,
             selectedBuiltInPresetName: selectedBuiltInPreset?.rawValue,
@@ -466,6 +481,26 @@ class EQModel: ObservableObject {
         volume = min(max(value, 0.0), 1.0)
     }
 
+    func setUsePerDeviceVolume(_ enabled: Bool) {
+        guard usePerDeviceVolume != enabled else { return }
+        usePerDeviceVolume = enabled
+
+        guard enabled,
+              let uid = currentDeviceUID,
+              let profile = profileManager.profile(for: uid) else {
+            return
+        }
+
+        volume = profile.volume
+    }
+
+    func setAutoSaveEnabled(_ enabled: Bool) {
+        autoSaveEnabled = enabled
+        if enabled {
+            autoSaveToDeviceProfile()
+        }
+    }
+
     func applyImportedBands(_ bands: [EQBand], preGain: Float) {
         recordHistorySnapshot(context: "imported-bands")
         parametricBands = bands
@@ -611,6 +646,7 @@ class EQModel: ObservableObject {
             settings.limiterCeilingDB = limiterCeilingDB
             settings.autoStopClippingEnabled = autoStopClippingEnabled
             settings.volume = volume
+            settings.usePerDeviceVolume = usePerDeviceVolume
             settings.autoSaveEnabled = autoSaveEnabled
 
             if let preset = selectedBuiltInPreset {
@@ -661,6 +697,7 @@ class EQModel: ObservableObject {
             limiterCeilingDB = settings.limiterCeilingDB
             autoStopClippingEnabled = settings.autoStopClippingEnabled
             volume = settings.volume
+            usePerDeviceVolume = settings.usePerDeviceVolume
             autoSaveEnabled = settings.autoSaveEnabled
 
             if let presetName = settings.selectedBuiltInPresetName,
@@ -692,6 +729,7 @@ class EQModel: ObservableObject {
         limiterEnabled = false
         limiterCeilingDB = -1.0
         autoStopClippingEnabled = UserDefaults.standard.object(forKey: legacyAutoStopClippingKey) as? Bool ?? false
+        usePerDeviceVolume = true
 
         if let presetName = UserDefaults.standard.string(forKey: legacyBuiltInPresetKey),
            let preset = BuiltInPreset(rawValue: presetName) {
@@ -702,6 +740,13 @@ class EQModel: ObservableObject {
 
         // Migrate from legacy UserDefaults keys to JSON save file on first launch after upgrade.
         saveSettings()
+    }
+
+    private func profileVolumeForSave(deviceUID: String) -> Float {
+        if usePerDeviceVolume {
+            return volume
+        }
+        return profileManager.profile(for: deviceUID)?.volume ?? volume
     }
 }
 
