@@ -3,244 +3,522 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SoundMaxx - Free SoundSource Alternative for macOS | 10-Band Parametric EQ</title>
-    <meta name="description" content="SoundMaxx is a free, open-source 10-band parametric equalizer for macOS with per-band frequency/Q controls, 7 filter types, smart device profiles, HDMI volume control, and AutoEQ integration.">
-    <meta name="keywords" content="SoundSource alternative, macOS equalizer, free EQ mac, parametric EQ macOS, 10-band EQ, filter types, HDMI volume control, AutoEQ, macOS Sonoma, eqMac alternative">
-    <meta name="author" content="snap-sites">
-
-    <!-- Open Graph / Social -->
+    <title>SoundMaxx | Free 10-Band Parametric EQ for macOS</title>
+    <meta name="description" content="SoundMaxx is a free, open-source 10-band parametric equalizer for macOS with filter type control, per-device profiles, HDMI volume support, and AutoEQ integration.">
+    <meta name="keywords" content="SoundSource alternative, macOS equalizer, free EQ Mac, parametric EQ, AutoEQ, HDMI volume macOS, open-source audio tool">
+    <meta name="author" content="brimell">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="SoundMaxx - Free SoundSource Alternative for macOS">
-    <meta property="og:description" content="Free, open-source 10-band parametric EQ with frequency/Q controls, 7 filter types, device profile auto-save, HDMI volume control, and AutoEQ integration.">
-    <meta property="og:url" content="https://snap-sites.github.io/SoundMaxx/">
-
-    <!-- Twitter -->
+    <meta property="og:title" content="SoundMaxx | Free 10-Band Parametric EQ for macOS">
+    <meta property="og:description" content="Free, open-source system-wide EQ with 7 filter types, smart device profiles, and AutoEQ headphone correction.">
+    <meta property="og:url" content="https://brimell.github.io/SoundMax/">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="SoundMaxx - Free SoundSource Alternative">
-    <meta name="twitter:description" content="Free 10-band parametric EQ for macOS with filter types, smart device profiles, and AutoEQ headphone correction.">
+    <meta name="twitter:title" content="SoundMaxx | Free Parametric EQ for macOS">
+    <meta name="twitter:description" content="A lightweight SoundSource alternative with real-time EQ, AutoEQ, and HDMI volume control.">
 
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
         :root {
-            --bg: #1a1a2e;
-            --card: #16213e;
-            --accent: #e94560;
-            --text: #eaeaea;
-            --muted: #a0a0a0;
+            --bg: #f4efe5;
+            --paper: #fffaf2;
+            --ink: #1a2233;
+            --ink-soft: #47556d;
+            --line: #d8d1c4;
+            --accent: #e24f3b;
+            --accent-deep: #bb3f2f;
+            --accent-soft: #ffd8d2;
+            --teal: #1f6f72;
+            --shadow: 0 18px 40px rgba(26, 34, 51, 0.12);
+            --radius-lg: 18px;
+            --radius-md: 12px;
+            --radius-sm: 9px;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.6;
+            font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 8% 12%, rgba(226, 79, 59, 0.18), transparent 24%),
+                radial-gradient(circle at 88% 8%, rgba(31, 111, 114, 0.16), transparent 22%),
+                linear-gradient(180deg, #f7f2e8 0%, #f4efe5 48%, #f1ebde 100%);
+            line-height: 1.55;
         }
-        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
-        header { text-align: center; padding: 3rem 0; }
-        h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
-        h1 span { color: var(--accent); }
-        .tagline { color: var(--muted); font-size: 1.2rem; margin-bottom: 2rem; }
-        .badges { margin: 1.5rem 0; }
-        .badges a { margin: 0 0.25rem; }
-        .cta { margin: 2rem 0; }
-        .btn {
+
+        .container {
+            width: min(1120px, calc(100vw - 2.4rem));
+            margin: 0 auto;
+            padding: 2rem 0 3.25rem;
+        }
+
+        .hero {
+            background: linear-gradient(145deg, rgba(255, 250, 242, 0.95), rgba(245, 237, 222, 0.95));
+            border: 1px solid var(--line);
+            border-radius: calc(var(--radius-lg) + 4px);
+            box-shadow: var(--shadow);
+            padding: 2.5rem 2rem 2rem;
+            text-align: center;
+            animation: lift 450ms ease-out both;
+        }
+
+        .eyebrow {
             display: inline-block;
-            padding: 0.75rem 1.5rem;
-            margin: 0.5rem;
-            border-radius: 8px;
+            font-family: 'Sora', 'IBM Plex Sans', sans-serif;
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--teal);
+            border: 1px solid rgba(31, 111, 114, 0.32);
+            background: rgba(31, 111, 114, 0.08);
+            border-radius: 999px;
+            padding: 0.35rem 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        h1,
+        h2,
+        h3 {
+            font-family: 'Sora', 'IBM Plex Sans', sans-serif;
+            line-height: 1.15;
+        }
+
+        h1 {
+            font-size: clamp(2rem, 5.4vw, 3.8rem);
+            margin-bottom: 0.7rem;
+            letter-spacing: -0.03em;
+        }
+
+        h1 span {
+            color: var(--accent);
+        }
+
+        .lead {
+            color: var(--ink-soft);
+            max-width: 760px;
+            margin: 0 auto;
+            font-size: clamp(1rem, 2.2vw, 1.16rem);
+        }
+
+        .muted {
+            color: var(--ink-soft);
+        }
+
+        .badges {
+            margin-top: 1.3rem;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .cta {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .btn {
             text-decoration: none;
-            font-weight: 600;
-            transition: transform 0.2s;
+            border-radius: var(--radius-sm);
+            font-family: 'Sora', 'IBM Plex Sans', sans-serif;
+            font-weight: 700;
+            font-size: 0.92rem;
+            letter-spacing: 0.01em;
+            padding: 0.78rem 1.15rem;
+            transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
         }
-        .btn:hover { transform: translateY(-2px); }
-        .btn-primary { background: var(--accent); color: white; }
-        .btn-secondary { background: var(--card); color: var(--text); border: 1px solid #333; }
-        .features {
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            color: #fff;
+            background: linear-gradient(160deg, var(--accent), var(--accent-deep));
+            box-shadow: 0 12px 18px rgba(178, 55, 38, 0.24);
+        }
+
+        .btn-secondary {
+            color: var(--ink);
+            border: 1px solid var(--line);
+            background: var(--paper);
+        }
+
+        .section {
+            margin-top: 2.2rem;
+            background: rgba(255, 250, 242, 0.88);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            padding: 1.6rem;
+            box-shadow: 0 8px 20px rgba(33, 40, 58, 0.07);
+            animation: lift 620ms ease-out both;
+        }
+
+        .section-title {
+            margin-bottom: 1rem;
+            font-size: clamp(1.35rem, 3.1vw, 1.95rem);
+            letter-spacing: -0.02em;
+        }
+
+        .feature-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin: 3rem 0;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.9rem;
         }
-        .feature {
-            background: var(--card);
-            padding: 1.5rem;
-            border-radius: 12px;
-            border: 1px solid #333;
+
+        .feature-card {
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.8);
+            transition: transform 190ms ease, box-shadow 190ms ease;
         }
-        .feature h3 { color: var(--accent); margin-bottom: 0.5rem; }
-        .comparison { margin: 3rem 0; }
-        .comparison h2 { text-align: center; margin-bottom: 1.5rem; }
+
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px rgba(33, 40, 58, 0.09);
+        }
+
+        .feature-card h3 {
+            font-size: 1.01rem;
+            margin-bottom: 0.45rem;
+            color: var(--accent-deep);
+        }
+
+        .screens {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.9rem;
+        }
+
+        figure {
+            border: 1px solid var(--line);
+            background: #fff;
+            border-radius: var(--radius-md);
+            padding: 0.72rem;
+        }
+
+        figure img {
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+            display: block;
+            box-shadow: 0 7px 17px rgba(29, 40, 62, 0.2);
+        }
+
+        figcaption {
+            margin-top: 0.62rem;
+            font-size: 0.9rem;
+            color: var(--ink-soft);
+        }
+
+        .comparison-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            background: var(--card);
-            border-radius: 12px;
-            overflow: hidden;
+            min-width: 640px;
+            background: #fff;
         }
-        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #333; }
-        th { background: #0f0f23; }
-        .check { color: #4ade80; }
-        .cross { color: #f87171; }
+
+        th,
+        td {
+            border-bottom: 1px solid #ebe3d5;
+            padding: 0.78rem;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f4e8d6;
+            font-family: 'Sora', 'IBM Plex Sans', sans-serif;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #405267;
+        }
+
+        .good {
+            color: #1f6f72;
+            font-weight: 700;
+        }
+
+        .bad {
+            color: #a04a4a;
+            font-weight: 600;
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.8rem;
+            margin-top: 0.9rem;
+        }
+
+        .step {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
+            padding: 0.9rem;
+        }
+
+        .step-index {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.6rem;
+            height: 1.6rem;
+            border-radius: 999px;
+            font-size: 0.84rem;
+            font-family: 'Sora', 'IBM Plex Sans', sans-serif;
+            font-weight: 700;
+            color: #fff;
+            background: var(--teal);
+            margin-bottom: 0.55rem;
+        }
+
+        .code {
+            margin-top: 0.9rem;
+            border: 1px solid #d8d0bf;
+            border-radius: var(--radius-sm);
+            background: #2c3242;
+            color: #f6f6f8;
+            font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+            font-size: 0.88rem;
+            padding: 0.82rem;
+            overflow-x: auto;
+        }
+
         footer {
+            margin-top: 2.2rem;
             text-align: center;
-            padding: 2rem;
-            color: var(--muted);
-            border-top: 1px solid #333;
-            margin-top: 3rem;
+            color: var(--ink-soft);
+            font-size: 0.94rem;
         }
-        footer a { color: var(--accent); }
-        @media (max-width: 600px) {
-            h1 { font-size: 1.8rem; }
-            .container { padding: 1rem; }
+
+        footer a {
+            color: var(--accent-deep);
+            text-underline-offset: 2px;
+        }
+
+        @keyframes lift {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 980px) {
+            .feature-grid,
+            .screens,
+            .steps {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 720px) {
+            .container {
+                width: min(1120px, calc(100vw - 1.4rem));
+                padding-top: 1.2rem;
+            }
+
+            .hero,
+            .section {
+                padding: 1.2rem;
+            }
+
+            .feature-grid,
+            .screens,
+            .steps {
+                grid-template-columns: 1fr;
+            }
+
+            .cta {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn {
+                text-align: center;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
+    <main class="container">
+        <header class="hero">
+            <p class="eyebrow">System-Wide Audio on macOS</p>
             <h1>Sound<span>Maxx</span></h1>
-            <p class="tagline">Free, open-source 10-band parametric EQ for macOS</p>
-            <p class="tagline" style="font-size: 1rem;">The lightweight <strong>SoundSource alternative</strong> you've been looking for</p>
+            <p class="lead">A free, open-source 10-band parametric EQ with frequency/Q control, profile-aware routing, and a clean menu bar workflow.</p>
+            <p class="muted" style="margin-top: 0.55rem;">A lightweight SoundSource alternative for people who want precision without subscription lock-in.</p>
 
             <div class="badges">
-                <img alt="GitHub release" src="https://img.shields.io/github/v/release/snap-sites/SoundMaxx?include_prereleases&style=flat-square">
-                <img alt="License" src="https://img.shields.io/github/license/snap-sites/SoundMaxx?style=flat-square">
-                <img alt="macOS" src="https://img.shields.io/badge/macOS-13.0+-blue?style=flat-square">
+                <img alt="GitHub release" src="https://img.shields.io/github/v/release/brimell/SoundMax?include_prereleases&style=flat-square">
+                <img alt="License" src="https://img.shields.io/github/license/brimell/SoundMax?style=flat-square">
+                <img alt="macOS" src="https://img.shields.io/badge/macOS-13.0%2B-blue?style=flat-square">
             </div>
 
             <div class="cta">
-                <a href="https://github.com/snap-sites/SoundMaxx/releases" class="btn btn-primary">Download Beta</a>
-                <a href="https://github.com/snap-sites/SoundMaxx" class="btn btn-secondary">View on GitHub</a>
+                <a class="btn btn-primary" href="https://github.com/brimell/SoundMax/releases">Download Latest Release</a>
+                <a class="btn btn-secondary" href="https://github.com/brimell/SoundMax">View Source on GitHub</a>
             </div>
         </header>
 
-        <section class="screenshots" style="margin: 3rem 0;">
-            <h2 style="text-align: center; margin-bottom: 1.5rem;">See It In Action</h2>
-            <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: center;">
-                <div style="text-align: center;">
-                    <img src="screenshot-main.png" alt="SoundMaxx parametric EQ interface" style="max-width: 320px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
-                    <p style="color: var(--muted); margin-top: 0.5rem; font-size: 0.9rem;">Parametric EQ with Advanced Controls</p>
-                </div>
-                <div style="text-align: center;">
-                    <img src="screenshot-help.png" alt="SoundMaxx quick help popover" style="max-width: 320px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
-                    <p style="color: var(--muted); margin-top: 0.5rem; font-size: 0.9rem;">Quick Help & Per-Device Profiles</p>
-                </div>
-                <div style="text-align: center;">
-                    <img src="screenshot-autoeq.png" alt="SoundMaxx AutoEQ headphone correction" style="max-width: 320px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
-                    <p style="color: var(--muted); margin-top: 0.5rem; font-size: 0.9rem;">AutoEQ Headphone Correction</p>
-                </div>
+        <section class="section" aria-labelledby="what-you-get">
+            <h2 class="section-title" id="what-you-get">Why SoundMaxx</h2>
+            <div class="feature-grid">
+                <article class="feature-card">
+                    <h3>10-Band Parametric EQ</h3>
+                    <p>Control gain, frequency, and Q from 32 Hz to 16 kHz in real time with low-latency processing.</p>
+                </article>
+                <article class="feature-card">
+                    <h3>7 Filter Types Per Band</h3>
+                    <p>Peak, shelf, pass, notch, and band-pass modes are available for each band in the main UI.</p>
+                </article>
+                <article class="feature-card">
+                    <h3>Per-Device Profiles</h3>
+                    <p>Save once per output device, then auto-restore and auto-save as you switch hardware.</p>
+                </article>
+                <article class="feature-card">
+                    <h3>Proper Gain Staging</h3>
+                    <p>Separate preamp and output gain with a limiter stage and split clip meters for confidence.</p>
+                </article>
+                <article class="feature-card">
+                    <h3>HDMI Volume Support</h3>
+                    <p>Software volume for HDMI and DisplayPort outputs where macOS disables hardware control.</p>
+                </article>
+                <article class="feature-card">
+                    <h3>AutoEQ Built In</h3>
+                    <p>Search and apply correction curves from AutoEQ for 150+ popular headphones and IEMs.</p>
+                </article>
             </div>
         </section>
 
-        <section class="features">
-            <div class="feature">
-                <h3>10-Band Parametric EQ</h3>
-                <p>Per-band frequency, gain, and Q control from 32Hz to 16kHz with real-time DSP processing.</p>
-            </div>
-            <div class="feature">
-                <h3>7 Filter Types Per Band</h3>
-                <p>Peak, Low Shelf, High Shelf, Low Pass, High Pass, Notch, and Band Pass filters built right into the UI.</p>
-            </div>
-            <div class="feature">
-                <h3>Smart Device Profiles</h3>
-                <p>Save once, then auto-restore and auto-save EQ plus software volume for each output device.</p>
-            </div>
-            <div class="feature">
-                <h3>HDMI Volume Control</h3>
-                <p>Software volume slider for HDMI outputs - fixes macOS's missing volume control.</p>
-            </div>
-            <div class="feature">
-                <h3>AutoEQ Integration</h3>
-                <p>Search and apply headphone correction curves for 150+ popular models, including AirPods, Sony, Sennheiser, and more.</p>
-            </div>
-            <div class="feature">
-                <h3>Menu Bar + Launch at Login</h3>
-                <p>Always available from the menu bar, with optional launch-at-login for a seamless daily workflow.</p>
+        <section class="section" aria-labelledby="screenshots">
+            <h2 class="section-title" id="screenshots">See It In Action</h2>
+            <div class="screens">
+                <figure>
+                    <img src="screenshot-main.png" alt="Main SoundMaxx parametric equalizer interface">
+                    <figcaption>Main EQ panel with per-band controls and real-time routing state.</figcaption>
+                </figure>
+                <figure>
+                    <img src="screenshot-help.png" alt="SoundMaxx quick help popover and profile hints">
+                    <figcaption>Quick help and profile-aware guidance for faster first-time setup.</figcaption>
+                </figure>
+                <figure>
+                    <img src="screenshot-autoeq.png" alt="AutoEQ search and apply dialog in SoundMaxx">
+                    <figcaption>AutoEQ browser for applying headphone correction in a few clicks.</figcaption>
+                </figure>
             </div>
         </section>
 
-        <section class="comparison">
-            <h2>SoundMaxx vs Alternatives</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Feature</th>
-                        <th>SoundMaxx</th>
-                        <th>SoundSource</th>
-                        <th>eqMac</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Price</td>
-                        <td><strong>Free</strong></td>
-                        <td>$39</td>
-                        <td>Free / $34 Pro</td>
-                    </tr>
-                    <tr>
-                        <td>10-Band Parametric EQ</td>
-                        <td class="check">✓</td>
-                        <td class="check">✓</td>
-                        <td class="check">✓</td>
-                    </tr>
-                    <tr>
-                        <td>Per-Device Profiles</td>
-                        <td class="check">✓ Auto</td>
-                        <td>Limited</td>
-                        <td>Limited</td>
-                    </tr>
-                    <tr>
-                        <td>Profile Auto-Save</td>
-                        <td class="check">✓</td>
-                        <td>Limited</td>
-                        <td>Limited</td>
-                    </tr>
-                    <tr>
-                        <td>HDMI Volume</td>
-                        <td class="check">✓</td>
-                        <td class="check">✓</td>
-                        <td class="check">✓</td>
-                    </tr>
-                    <tr>
-                        <td>AutoEQ Built-in</td>
-                        <td class="check">✓ 150+ headphones</td>
-                        <td class="cross">✗</td>
-                        <td class="check">✓</td>
-                    </tr>
-                    <tr>
-                        <td>Open Source</td>
-                        <td class="check">✓</td>
-                        <td class="cross">✗</td>
-                        <td class="check">✓</td>
-                    </tr>
-                    <tr>
-                        <td>Native SwiftUI</td>
-                        <td class="check">✓</td>
-                        <td>Partial</td>
-                        <td class="cross">✗</td>
-                    </tr>
-                </tbody>
-            </table>
+        <section class="section" aria-labelledby="comparison">
+            <h2 class="section-title" id="comparison">SoundMaxx vs Alternatives</h2>
+            <div class="comparison-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>SoundMaxx</th>
+                            <th>SoundSource</th>
+                            <th>eqMac</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Price</td>
+                            <td class="good">Free</td>
+                            <td>$39</td>
+                            <td>Free / $34 Pro</td>
+                        </tr>
+                        <tr>
+                            <td>10-band parametric control</td>
+                            <td class="good">Yes</td>
+                            <td class="good">Yes</td>
+                            <td class="good">Yes</td>
+                        </tr>
+                        <tr>
+                            <td>Auto profile restore + save</td>
+                            <td class="good">Yes</td>
+                            <td>Limited</td>
+                            <td>Limited</td>
+                        </tr>
+                        <tr>
+                            <td>AutoEQ headphone import</td>
+                            <td class="good">Yes (150+)</td>
+                            <td class="bad">No</td>
+                            <td class="good">Yes</td>
+                        </tr>
+                        <tr>
+                            <td>HDMI software volume</td>
+                            <td class="good">Yes</td>
+                            <td class="good">Yes</td>
+                            <td class="good">Yes</td>
+                        </tr>
+                        <tr>
+                            <td>Open-source codebase</td>
+                            <td class="good">Yes</td>
+                            <td class="bad">No</td>
+                            <td class="good">Yes</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
 
-        <section style="text-align: center; margin: 3rem 0;">
-            <h2>Quick Start</h2>
-            <p style="color: var(--muted); margin: 1rem 0;">Get system-wide EQ in under 2 minutes</p>
-            <div style="background: var(--card); padding: 1.5rem; border-radius: 12px; text-align: left; font-family: monospace; margin: 1rem 0;">
-                <p style="color: var(--muted);"># 1. Install BlackHole audio driver</p>
-                <p>brew install blackhole-2ch</p>
-                <br>
-                <p style="color: var(--muted);"># 2. Download SoundMaxx from GitHub Releases</p>
-                <br>
-                <p style="color: var(--muted);"># 3. Set system output to "BlackHole 2ch"</p>
-                <br>
-                <p style="color: var(--muted);"># 4. Launch SoundMaxx, select your speakers, click Start</p>
+        <section class="section" aria-labelledby="quick-start">
+            <h2 class="section-title" id="quick-start">Quick Start</h2>
+            <p class="muted">Get system-wide EQ running in under two minutes.</p>
+            <div class="steps">
+                <article class="step">
+                    <p class="step-index">1</p>
+                    <h3>Install BlackHole</h3>
+                    <p>Install the virtual audio driver used for safe system-wide routing.</p>
+                </article>
+                <article class="step">
+                    <p class="step-index">2</p>
+                    <h3>Download SoundMaxx</h3>
+                    <p>Grab the latest DMG from GitHub Releases and move it to Applications.</p>
+                </article>
+                <article class="step">
+                    <p class="step-index">3</p>
+                    <h3>Set System Output</h3>
+                    <p>Choose BlackHole 2ch in macOS Sound settings so all apps route through it.</p>
+                </article>
+                <article class="step">
+                    <p class="step-index">4</p>
+                    <h3>Select Real Output</h3>
+                    <p>In SoundMaxx, pick your speakers or headphones and click Start.</p>
+                </article>
             </div>
+            <pre class="code">brew install blackhole-2ch</pre>
         </section>
 
         <footer>
-            <p>Made with SwiftUI & Core Audio</p>
-            <p><a href="https://github.com/snap-sites/SoundMaxx">GitHub</a> · <a href="https://github.com/snap-sites/SoundMaxx/issues">Report Issue</a> · MIT License</p>
+            <p>Built with SwiftUI and Core Audio.</p>
+            <p>
+                <a href="https://github.com/brimell/SoundMax">GitHub</a>
+                |
+                <a href="https://github.com/brimell/SoundMax/issues">Report an issue</a>
+                |
+                MIT License
+            </p>
         </footer>
-    </div>
+    </main>
 </body>
 </html>

@@ -4,6 +4,8 @@ A free, open-source macOS system-wide 10-band parametric equalizer.
 
 SoundMaxx sits in your menu bar and applies real-time EQ processing to all system audio, letting you fine-tune your listening experience across any app.
 
+Project website: [https://brimell.github.io/SoundMax/](https://brimell.github.io/SoundMax/)
+
 ## Features
 
 - **10-Band Parametric EQ** - 32Hz to 16kHz with per-band frequency, gain, and Q control
@@ -41,9 +43,13 @@ Or download directly from [BlackHole Releases](https://github.com/ExistentialAud
 
 ### Step 2: Install SoundMaxx
 
+Visit the website for screenshots and a quick feature overview:
+
+- [https://brimell.github.io/SoundMax/](https://brimell.github.io/SoundMax/)
+
 **Option A: Download Release (Recommended)**
 
-1. Download the latest DMG from [Releases](https://github.com/brimell/SoundMaxx/releases)
+1. Download the latest DMG from [Releases](https://github.com/brimell/SoundMax/releases)
 2. Open the DMG and drag SoundMaxx to Applications
 3. If macOS blocks the app: Right-click → Open → Open
 
@@ -57,8 +63,8 @@ xcode-select --install
 brew install xcodegen
 
 # Clone and build
-git clone https://github.com/brimell/SoundMaxx.git
-cd SoundMaxx
+git clone https://github.com/brimell/SoundMax.git
+cd SoundMax
 xcodegen generate
 xcodebuild -project SoundMaxx.xcodeproj -scheme SoundMaxx -configuration Release build
 ```
