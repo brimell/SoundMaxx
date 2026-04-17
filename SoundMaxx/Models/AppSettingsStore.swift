@@ -17,6 +17,7 @@ struct AppSettings: Codable {
     var selectedCustomPresetID: String? = nil
     var selectedInputDeviceID: Int32? = nil
     var selectedOutputDeviceID: Int32? = nil
+    var shortcutOutputDeviceUIDs: [String]? = nil
 
     enum CodingKeys: String, CodingKey {
         case parametricBands
@@ -33,6 +34,7 @@ struct AppSettings: Codable {
         case selectedCustomPresetID
         case selectedInputDeviceID
         case selectedOutputDeviceID
+        case shortcutOutputDeviceUIDs
     }
 
     init() {}
@@ -54,6 +56,7 @@ struct AppSettings: Codable {
         selectedCustomPresetID = try container.decodeIfPresent(String.self, forKey: .selectedCustomPresetID)
         selectedInputDeviceID = try container.decodeIfPresent(Int32.self, forKey: .selectedInputDeviceID)
         selectedOutputDeviceID = try container.decodeIfPresent(Int32.self, forKey: .selectedOutputDeviceID)
+        shortcutOutputDeviceUIDs = try container.decodeIfPresent([String].self, forKey: .shortcutOutputDeviceUIDs)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -73,6 +76,7 @@ struct AppSettings: Codable {
         try container.encode(selectedCustomPresetID, forKey: .selectedCustomPresetID)
         try container.encode(selectedInputDeviceID, forKey: .selectedInputDeviceID)
         try container.encode(selectedOutputDeviceID, forKey: .selectedOutputDeviceID)
+        try container.encode(shortcutOutputDeviceUIDs, forKey: .shortcutOutputDeviceUIDs)
     }
 }
 

@@ -153,7 +153,11 @@ struct SoundMaxxApp: App {
 
     private static func cycleToNextOutputDevice(audioEngine: AudioEngine) {
         let deviceManager = AudioDeviceManager()
-        guard let nextDevice = deviceManager.nextOutputDevice(after: audioEngine.selectedOutputDeviceID) else {
+        let preferredUIDs = AppSettingsStore.shared.load()?.shortcutOutputDeviceUIDs
+        guard let nextDevice = deviceManager.nextOutputDevice(
+            after: audioEngine.selectedOutputDeviceID,
+            preferredUIDs: preferredUIDs
+        ) else {
             return
         }
 

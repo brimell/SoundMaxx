@@ -3,6 +3,7 @@ import Foundation
 
 struct AudioDevice: Identifiable, Hashable {
     let id: AudioDeviceID
+    let uid: String
     let name: String
     let isInput: Bool
     let isOutput: Bool
@@ -21,21 +22,32 @@ class AudioDeviceManager: ObservableObject {
         inputDevices = getDevices(forInput: true)
     }
 
-    func nextOutputDevice(after currentDeviceID: AudioDeviceID?) -> AudioDevice? {
+    func nextOutputDevice(after currentDeviceID: AudioDeviceID?, preferredUIDs: [String]? = nil) -> AudioDevice? {
         refreshDevices()
-        guard !outputDevices.isEmpty else { return nil }
+        let cyclingDevices = filteredOutputDevices(preferredUIDs: preferredUIDs)
+        guard !cyclingDevices.isEmpty else { return nil }
 
         guard let currentDeviceID,
-              let currentIndex = outputDevices.firstIndex(where: { $0.id == currentDeviceID }) else {
-            return outputDevices.first
+              let currentIndex = cyclingDevices.firstIndex(where: { $0.id == currentDeviceID }) else {
+            return cyclingDevices.first
         }
 
-        let nextIndex = outputDevices.index(after: currentIndex)
-        if nextIndex == outputDevices.endIndex {
-            return outputDevices.first
+        let nextIndex = cyclingDevices.index(after: currentIndex)
+        if nextIndex == cyclingDevices.endIndex {
+            return cyclingDevices.first
         }
 
-        return outputDevices[nextIndex]
+        return cyclingDevices[nextIndex]
+    }
+
+    private func filteredOutputDevices(preferredUIDs: [String]?) -> [AudioDevice] {
+        guard let preferredUIDs, !preferredUIDs.isEmpty else {
+            return outputDevices
+        }
+
+        let preferredSet = Set(preferredUIDs)
+        let filtered = outputDevices.filter { preferredSet.contains($0.uid) }
+        return filtered.isEmpty ? outputDevices : filtered
     }
 
     func getDevices(forInput isInput: Bool) -> [AudioDevice] {
@@ -72,12 +84,14 @@ class AudioDeviceManager: ObservableObject {
 
         return deviceIDs.compactMap { deviceID -> AudioDevice? in
             guard let name = getDeviceName(deviceID),
+                  let uid = getDeviceUID(deviceID),
                   hasStreams(deviceID, isInput: isInput) else {
                 return nil
             }
 
             return AudioDevice(
                 id: deviceID,
+                uid: uid,
                 name: name,
                 isInput: isInput,
                 isOutput: !isInput
@@ -127,6 +141,29 @@ class AudioDeviceManager: ObservableObject {
         )
 
         return status == noErr && dataSize > 0
+    }
+
+    private func getDeviceUID(_ deviceID: AudioDeviceID) -> String? {
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var unmanagedUID: Unmanaged<CFString>?
+        var dataSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+
+        let status = AudioObjectGetPropertyData(
+            deviceID,
+            &propertyAddress,
+            0,
+            nil,
+            &dataSize,
+            &unmanagedUID
+        )
+
+        guard status == noErr, let deviceUID = unmanagedUID?.takeRetainedValue() else { return nil }
+        return deviceUID as String
     }
 
     func findBlackHole() -> AudioDevice? {

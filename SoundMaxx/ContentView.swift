@@ -18,6 +18,7 @@ struct ContentView: View {
     @StateObject private var presetManager = PresetManager()
 
     @State private var selectedInputID: AudioDeviceID?
+    @State private var shortcutOutputDeviceUIDs: [String] = []
     @State private var showingSavePreset = false
     @State private var showingAutoEQ = false
     @State private var showingEQImportPicker = false
@@ -84,6 +85,7 @@ struct ContentView: View {
         .frame(width: menuWidth)
         .font(.system(size: 14))
         .onAppear {
+            loadShortcutOutputTargets()
             setupDeviceChangeCallback()
             eqModel.resolvePresetSelection(using: presetManager.customPresets)
             syncEQToEngine()
@@ -165,6 +167,8 @@ struct ContentView: View {
             }
             .buttonStyle(.borderless)
             .help("Refresh output devices")
+
+            shortcutTargetsMenu
         }
     }
 
@@ -253,7 +257,7 @@ struct ContentView: View {
                 helpRow(icon: "square.and.arrow.down", title: "Presets", desc: "Select or save EQ configurations")
                 helpRow(icon: "headphones", title: "AutoEQ", desc: "Apply headphone correction curves")
                 helpRow(icon: "hifispeaker", title: "Device Profiles", desc: "EQ settings saved per output device")
-                helpRow(icon: "keyboard", title: "Output Shortcut", desc: "Control+Option+Command+O switches to next output")
+                helpRow(icon: "keyboard", title: "Output Shortcut", desc: "Control+Option+Command+O switches between selected outputs")
                 helpRow(icon: "power", title: "Start/Stop", desc: "Toggle audio processing")
             }
 
@@ -901,13 +905,21 @@ struct ContentView: View {
                     Label("Switch Output", systemImage: "keyboard")
                 }
                 .buttonStyle(.borderless)
-                .help("Switch to next output device")
+                .help("Switch to next selected output device")
+
+                shortcutTargetsMenu
 
                 Spacer()
 
-                Text("Control+Option+Command+O")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("Control+Option+Command+O")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Text(shortcutTargetsSummary)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
 
             // Device profile controls
@@ -1199,14 +1211,76 @@ struct ContentView: View {
         settingsStore.update { settings in
             settings.selectedInputDeviceID = selectedInputID.map { Int32($0) }
             settings.selectedOutputDeviceID = audioEngine.selectedOutputDeviceID.map { Int32($0) }
+            settings.shortcutOutputDeviceUIDs = shortcutOutputDeviceUIDs.isEmpty ? nil : shortcutOutputDeviceUIDs
         }
     }
 
     private func cycleToNextOutputDevice() {
         let currentDeviceID = audioEngine.selectedOutputDeviceID
-        guard let nextDevice = deviceManager.nextOutputDevice(after: currentDeviceID) else { return }
+        guard let nextDevice = deviceManager.nextOutputDevice(
+            after: currentDeviceID,
+            preferredUIDs: shortcutOutputDeviceUIDs
+        ) else { return }
 
         audioEngine.setOutputDevice(nextDevice.id)
+        persistSelectedDevices()
+    }
+
+    private var shortcutTargetsMenu: some View {
+        Menu {
+            Button("Use All Outputs") {
+                shortcutOutputDeviceUIDs = []
+                persistSelectedDevices()
+            }
+
+            if !deviceManager.outputDevices.isEmpty {
+                Divider()
+
+                ForEach(deviceManager.outputDevices) { device in
+                    Button {
+                        toggleShortcutTarget(for: device)
+                    } label: {
+                        HStack {
+                            Text(device.name)
+                            if shortcutOutputDeviceUIDs.contains(device.uid) {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            Label("Targets", systemImage: "line.3.horizontal.decrease.circle")
+                .labelStyle(.titleAndIcon)
+        }
+        .buttonStyle(.borderless)
+        .help("Choose which outputs the shortcut cycles through")
+    }
+
+    private var shortcutTargetsSummary: String {
+        if shortcutOutputDeviceUIDs.isEmpty {
+            return "Shortcut targets: all outputs"
+        }
+
+        let totalSelectedCount = shortcutOutputDeviceUIDs.count
+        let connectedTargetCount = deviceManager.outputDevices.filter { shortcutOutputDeviceUIDs.contains($0.uid) }.count
+        if connectedTargetCount == totalSelectedCount {
+            return "Shortcut targets: \(totalSelectedCount) selected"
+        }
+
+        return "Shortcut targets: \(connectedTargetCount) connected of \(totalSelectedCount) selected"
+    }
+
+    private func loadShortcutOutputTargets() {
+        shortcutOutputDeviceUIDs = settingsStore.load()?.shortcutOutputDeviceUIDs ?? []
+    }
+
+    private func toggleShortcutTarget(for device: AudioDevice) {
+        if let index = shortcutOutputDeviceUIDs.firstIndex(of: device.uid) {
+            shortcutOutputDeviceUIDs.remove(at: index)
+        } else {
+            shortcutOutputDeviceUIDs.append(device.uid)
+        }
         persistSelectedDevices()
     }
 
