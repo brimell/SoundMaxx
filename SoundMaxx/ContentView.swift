@@ -351,14 +351,16 @@ struct ContentView: View {
                 }
             }
 
-            if isCompactLayout {
-                eqBandSliderRow
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 2)
-            } else {
-                ScrollView(.horizontal, showsIndicators: true) {
+            Group {
+                if isCompactLayout {
                     eqBandSliderRow
+                        .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 2)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: true) {
+                        eqBandSliderRow
+                            .padding(.vertical, 2)
+                    }
                 }
             }
             .opacity(eqModel.isEnabled ? (eqModel.isEQFiltersEnabled ? 1.0 : 0.7) : 0.5)
