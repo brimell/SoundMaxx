@@ -1037,6 +1037,14 @@ struct ContentView: View {
                 }
             }
 
+            HStack {
+                Spacer()
+
+                Text("Designed and built by Bill Rimell")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
             if let error = audioEngine.errorMessage {
                 Text(error)
                     .font(.caption)
