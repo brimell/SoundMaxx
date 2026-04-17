@@ -172,8 +172,6 @@ struct ContentView: View {
             }
             .buttonStyle(.borderless)
             .help("Refresh output devices")
-
-            shortcutTargetsMenu
         }
     }
 
