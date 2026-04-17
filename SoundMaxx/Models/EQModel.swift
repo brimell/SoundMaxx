@@ -7,7 +7,7 @@ class EQModel: ObservableObject {
     @Published var isEQFiltersEnabled: Bool = true
     @Published var preGain: Float = 0.0
     @Published var outputGain: Float = 0.0
-    @Published var limiterEnabled: Bool = true
+    @Published var limiterEnabled: Bool = false
     @Published var limiterCeilingDB: Float = -1.0
     @Published var autoStopClippingEnabled: Bool = false
     @Published var volume: Float = 1.0
@@ -21,6 +21,7 @@ class EQModel: ObservableObject {
     @Published var autoSaveEnabled: Bool = true
 
     static let frequencyLabels = ["32", "64", "125", "250", "500", "1K", "2K", "4K", "8K", "16K"]
+    static let minimumBandCount = 1
     static let preGainRange: ClosedRange<Float> = -12.0...0.0
     static let outputGainRange: ClosedRange<Float> = -40.0...40.0
 
@@ -296,6 +297,80 @@ class EQModel: ObservableObject {
         clearPresetSelection()
     }
 
+    func addBand() {
+        addBand(after: parametricBands.indices.last)
+    }
+
+    func addBand(after index: Int?) {
+        let insertionIndex: Int
+        if let index, parametricBands.indices.contains(index) {
+            insertionIndex = index + 1
+        } else {
+            insertionIndex = parametricBands.count
+        }
+
+        let newFrequency = suggestedFrequency(after: index)
+        let templateBand = (index != nil && parametricBands.indices.contains(index!))
+            ? parametricBands[index!]
+            : (parametricBands.last ?? EQBand(frequency: 1000.0))
+
+        var newBand = templateBand
+        newBand.id = UUID()
+        newBand.frequency = newFrequency
+        newBand.gain = 0.0
+
+        var updatedBands = parametricBands
+        updatedBands.insert(newBand, at: min(max(0, insertionIndex), updatedBands.count))
+        parametricBands = updatedBands
+        clearPresetSelection()
+    }
+
+    func removeLastBand() {
+        guard parametricBands.count > Self.minimumBandCount else { return }
+        var updatedBands = parametricBands
+        updatedBands.removeLast()
+        parametricBands = updatedBands
+        clearPresetSelection()
+    }
+
+    private func suggestedFrequency(after index: Int?) -> Float {
+        let minFrequency: Float = 20.0
+        let maxFrequency: Float = 20_000.0
+
+        guard !parametricBands.isEmpty else { return 1000.0 }
+
+        if let index, parametricBands.indices.contains(index) {
+            let left = min(max(parametricBands[index].frequency, minFrequency), maxFrequency)
+
+            if parametricBands.indices.contains(index + 1) {
+                let right = min(max(parametricBands[index + 1].frequency, minFrequency), maxFrequency)
+                if right > left {
+                    return sqrtf(left * right)
+                }
+            }
+
+            if index > 0 {
+                let previous = min(max(parametricBands[index - 1].frequency, minFrequency), maxFrequency)
+                if left > previous {
+                    return min(left * (left / previous), maxFrequency)
+                }
+            }
+
+            return min(left * 1.5, maxFrequency)
+        }
+
+        if parametricBands.count >= 2 {
+            let last = min(max(parametricBands[parametricBands.count - 1].frequency, minFrequency), maxFrequency)
+            let previous = min(max(parametricBands[parametricBands.count - 2].frequency, minFrequency), maxFrequency)
+            if last > previous {
+                return min(last * (last / previous), maxFrequency)
+            }
+            return min(last * 1.5, maxFrequency)
+        }
+
+        return min(max(parametricBands[0].frequency * 2.0, minFrequency), maxFrequency)
+    }
+
     func setPreGain(gain: Float) {
         preGain = Self.clampPreGain(gain)
         clearPresetSelection()
@@ -403,7 +478,7 @@ class EQModel: ObservableObject {
         isEnabled = UserDefaults.standard.object(forKey: legacyEnabledKey) as? Bool ?? true
         preGain = Self.clampPreGain(UserDefaults.standard.object(forKey: legacyPreGainKey) as? Float ?? 0.0)
         outputGain = 0.0
-        limiterEnabled = true
+        limiterEnabled = false
         limiterCeilingDB = -1.0
         autoStopClippingEnabled = UserDefaults.standard.object(forKey: legacyAutoStopClippingKey) as? Bool ?? false
 

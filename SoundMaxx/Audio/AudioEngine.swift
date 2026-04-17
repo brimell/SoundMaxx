@@ -28,7 +28,7 @@ class AudioEngine: ObservableObject {
     @Published var softwareVolume: Float = 1.0
     @Published var preGain: Float = 0.0
     @Published var outputGain: Float = 0.0
-    @Published var limiterEnabled: Bool = true
+    @Published var limiterEnabled: Bool = false
     @Published var limiterCeilingDB: Float = -1.0
     @Published var autoStopClippingEnabled: Bool = false
     @Published private(set) var eqStagePeakSample: Float = 0.0

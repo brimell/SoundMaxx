@@ -138,11 +138,11 @@ struct CustomPreset: Codable, Identifiable, Equatable {
         self.parametricBands = EQBand.tenBand(withGains: values)
         self.preGain = 0.0
         self.outputGain = 0.0
-        self.limiterEnabled = true
+        self.limiterEnabled = false
         self.limiterCeilingDB = -1.0
     }
 
-    init(name: String, bands: [EQBand], preGain: Float = 0.0, outputGain: Float = 0.0, limiterEnabled: Bool = true, limiterCeilingDB: Float = -1.0) {
+    init(name: String, bands: [EQBand], preGain: Float = 0.0, outputGain: Float = 0.0, limiterEnabled: Bool = false, limiterCeilingDB: Float = -1.0) {
         self.id = UUID()
         self.name = name
         self.values = bands.map { $0.gain }
@@ -176,7 +176,7 @@ struct CustomPreset: Codable, Identifiable, Equatable {
         parametricBands = try container.decodeIfPresent([EQBand].self, forKey: .parametricBands)
         preGain = try container.decodeIfPresent(Float.self, forKey: .preGain) ?? 0.0
         outputGain = try container.decodeIfPresent(Float.self, forKey: .outputGain) ?? 0.0
-        limiterEnabled = try container.decodeIfPresent(Bool.self, forKey: .limiterEnabled) ?? true
+        limiterEnabled = try container.decodeIfPresent(Bool.self, forKey: .limiterEnabled) ?? false
         limiterCeilingDB = try container.decodeIfPresent(Float.self, forKey: .limiterCeilingDB) ?? -1.0
     }
 
@@ -203,7 +203,7 @@ class PresetManager: ObservableObject {
         loadPresets()
     }
 
-    func savePreset(name: String, bands: [EQBand], preGain: Float = 0.0, outputGain: Float = 0.0, limiterEnabled: Bool = true, limiterCeilingDB: Float = -1.0) {
+    func savePreset(name: String, bands: [EQBand], preGain: Float = 0.0, outputGain: Float = 0.0, limiterEnabled: Bool = false, limiterCeilingDB: Float = -1.0) {
         let preset = CustomPreset(
             name: name,
             bands: bands,
@@ -221,7 +221,7 @@ class PresetManager: ObservableObject {
         persistPresets()
     }
 
-    func updatePreset(_ preset: CustomPreset, bands: [EQBand], preGain: Float = 0.0, outputGain: Float = 0.0, limiterEnabled: Bool = true, limiterCeilingDB: Float = -1.0) {
+    func updatePreset(_ preset: CustomPreset, bands: [EQBand], preGain: Float = 0.0, outputGain: Float = 0.0, limiterEnabled: Bool = false, limiterCeilingDB: Float = -1.0) {
         if let index = customPresets.firstIndex(where: { $0.id == preset.id }) {
             customPresets[index].values = bands.map { $0.gain }
             customPresets[index].parametricBands = bands

@@ -27,7 +27,7 @@ struct DeviceProfile: Codable, Identifiable {
         parametricBands: [EQBand]? = nil,
         preGain: Float = 0.0,
         outputGain: Float = 0.0,
-        limiterEnabled: Bool = true,
+        limiterEnabled: Bool = false,
         limiterCeilingDB: Float = -1.0,
         autoStopClippingEnabled: Bool = false,
         volume: Float = 1.0,
@@ -85,7 +85,7 @@ struct DeviceProfile: Codable, Identifiable {
         parametricBands = try container.decodeIfPresent([EQBand].self, forKey: .parametricBands)
         preGain = try container.decodeIfPresent(Float.self, forKey: .preGain) ?? 0.0
         outputGain = try container.decodeIfPresent(Float.self, forKey: .outputGain) ?? 0.0
-        limiterEnabled = try container.decodeIfPresent(Bool.self, forKey: .limiterEnabled) ?? true
+        limiterEnabled = try container.decodeIfPresent(Bool.self, forKey: .limiterEnabled) ?? false
         limiterCeilingDB = try container.decodeIfPresent(Float.self, forKey: .limiterCeilingDB) ?? -1.0
         autoStopClippingEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoStopClippingEnabled) ?? false
         volume = try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0

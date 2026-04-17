@@ -8,7 +8,7 @@ struct AppSettings: Codable {
     var isEQFiltersEnabled: Bool = true
     var preGain: Float = 0.0
     var outputGain: Float = 0.0
-    var limiterEnabled: Bool = true
+    var limiterEnabled: Bool = false
     var limiterCeilingDB: Float = -1.0
     var autoStopClippingEnabled: Bool = false
     var volume: Float = 1.0
@@ -45,7 +45,7 @@ struct AppSettings: Codable {
         isEQFiltersEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEQFiltersEnabled) ?? true
         preGain = try container.decodeIfPresent(Float.self, forKey: .preGain) ?? 0.0
         outputGain = try container.decodeIfPresent(Float.self, forKey: .outputGain) ?? 0.0
-        limiterEnabled = try container.decodeIfPresent(Bool.self, forKey: .limiterEnabled) ?? true
+        limiterEnabled = try container.decodeIfPresent(Bool.self, forKey: .limiterEnabled) ?? false
         limiterCeilingDB = try container.decodeIfPresent(Float.self, forKey: .limiterCeilingDB) ?? -1.0
         autoStopClippingEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoStopClippingEnabled) ?? false
         volume = try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0
