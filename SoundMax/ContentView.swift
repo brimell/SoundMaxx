@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var showingHelp = false
     @State private var newPresetName = ""
     @State private var selectedBandIndex = 0
+    @State private var didInitialStartup = false
     @StateObject private var launchAtLogin = LaunchAtLogin()
 
     var body: some View {
@@ -47,7 +48,10 @@ struct ContentView: View {
         .onAppear {
             setupDeviceChangeCallback()
             syncEQToEngine()
-            autoSelectDevices()
+            if !didInitialStartup {
+                autoSelectDevicesAndStart()
+                didInitialStartup = true
+            }
         }
         .onChange(of: eqModel.parametricBands) { newValue in
             audioEngine.setBands(newValue)
@@ -613,10 +617,21 @@ struct ContentView: View {
         return "\(band.type.displayName): \(frequencyText)Hz, Q \(qText), Gain \(Int(band.gain))dB"
     }
 
-    private func autoSelectDevices() {
-        if let blackhole = deviceManager.findBlackHole() {
+    private func autoSelectDevicesAndStart() {
+        if selectedInputID == nil, let blackhole = deviceManager.findBlackHole() {
             selectedInputID = blackhole.id
             audioEngine.setInputDevice(blackhole.id)
+        }
+
+        if selectedOutputID == nil, let defaultOutputID = deviceManager.getDefaultOutputDevice() {
+            selectedOutputID = defaultOutputID
+            audioEngine.setOutputDevice(defaultOutputID)
+        }
+
+        if !audioEngine.isRunning,
+           audioEngine.selectedInputDeviceID != nil,
+           audioEngine.selectedOutputDeviceID != nil {
+            audioEngine.start()
         }
     }
 }
