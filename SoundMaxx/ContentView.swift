@@ -83,6 +83,8 @@ struct ContentView: View {
         audioEngine.onOutputDeviceChanged = { _, uid, name in
             DispatchQueue.main.async {
                 eqModel.onDeviceChanged(deviceUID: uid, deviceName: name)
+                audioEngine.setBands(eqModel.parametricBands)
+                audioEngine.setBypass(!eqModel.isEnabled)
                 // Sync volume from profile to engine
                 audioEngine.setPreGain(eqModel.preGain)
                 audioEngine.setAutoStopClippingEnabled(eqModel.autoStopClippingEnabled)
