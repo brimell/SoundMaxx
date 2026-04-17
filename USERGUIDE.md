@@ -1,6 +1,6 @@
-# SoundMax User Guide
+# SoundMaxx User Guide
 
-A complete guide to setting up and using SoundMax, your system-wide audio equalizer for macOS.
+A complete guide to setting up and using SoundMaxx, your system-wide audio equalizer for macOS.
 
 ---
 
@@ -23,7 +23,7 @@ A complete guide to setting up and using SoundMax, your system-wide audio equali
 
 1. Install BlackHole: `brew install blackhole-2ch`
 2. Set system output to "BlackHole 2ch" in System Settings → Sound
-3. Launch SoundMax from Applications
+3. Launch SoundMaxx from Applications
 4. Select your speakers/headphones as Output
 5. Click **Start**
 6. Adjust the EQ sliders to taste
@@ -34,7 +34,7 @@ A complete guide to setting up and using SoundMax, your system-wide audio equali
 
 ### Step 1: Install BlackHole Audio Driver
 
-BlackHole is a free virtual audio driver that captures system audio for SoundMax to process.
+BlackHole is a free virtual audio driver that captures system audio for SoundMaxx to process.
 
 **Using Homebrew (recommended):**
 ```bash
@@ -47,18 +47,18 @@ brew install blackhole-2ch
 3. Follow the installation prompts
 4. Restart your Mac if prompted
 
-### Step 2: Install SoundMax
+### Step 2: Install SoundMaxx
 
-1. Download `SoundMax-Installer.dmg` from the [Releases page](https://github.com/snap-sites/SoundMax/releases)
+1. Download `SoundMaxx-Installer.dmg` from the [Releases page](https://github.com/snap-sites/SoundMaxx/releases)
 2. Open the DMG file
-3. Drag **SoundMax** to the **Applications** folder
+3. Drag **SoundMaxx** to the **Applications** folder
 4. Eject the DMG
 
 ### Step 3: First Launch
 
-1. Open SoundMax from Applications (or use Spotlight: ⌘+Space, type "SoundMax")
+1. Open SoundMaxx from Applications (or use Spotlight: ⌘+Space, type "SoundMaxx")
 2. If macOS blocks the app:
-   - Right-click SoundMax → **Open** → **Open**
+   - Right-click SoundMaxx → **Open** → **Open**
    - Or: System Settings → Privacy & Security → Click **Open Anyway**
 3. Grant microphone access when prompted (required to capture audio)
 
@@ -72,11 +72,11 @@ brew install blackhole-2ch
 2. Select **BlackHole 2ch** as your output device
 3. Your system audio is now routed through BlackHole
 
-> **Note:** You won't hear any sound until SoundMax is running and configured.
+> **Note:** You won't hear any sound until SoundMaxx is running and configured.
 
-### Configure SoundMax
+### Configure SoundMaxx
 
-1. Click the **slider icon** in your menu bar to open SoundMax
+1. Click the **slider icon** in your menu bar to open SoundMaxx
 2. **Input**: Should auto-select "BlackHole 2ch" (if not, select it manually)
 3. **Output**: Select your actual speakers or headphones:
    - MacBook Speakers
@@ -91,7 +91,7 @@ brew install blackhole-2ch
 
 ```
 ┌──────────────┐      ┌───────────┐      ┌──────────┐      ┌──────────────┐
-│  Your Apps   │  →   │ BlackHole │  →   │ SoundMax │  →   │   Speakers   │
+│  Your Apps   │  →   │ BlackHole │  →   │ SoundMaxx │  →   │   Speakers   │
 │  (Spotify,   │      │           │      │   (EQ)   │      │ (Your actual │
 │   YouTube)   │      │           │      │          │      │    output)   │
 └──────────────┘      └───────────┘      └──────────┘      └──────────────┘
@@ -136,7 +136,7 @@ Click the **Reset** button to return all bands to 0dB (flat response).
 
 ### Built-in Presets
 
-SoundMax includes 7 professionally-tuned presets:
+SoundMaxx includes 7 professionally-tuned presets:
 
 | Preset | Description |
 |--------|-------------|
@@ -171,7 +171,7 @@ SoundMax includes 7 professionally-tuned presets:
 
 ## Per-Device Profiles
 
-SoundMax remembers your EQ settings for each output device. This is perfect if you use different audio equipment throughout the day.
+SoundMaxx remembers your EQ settings for each output device. This is perfect if you use different audio equipment throughout the day.
 
 ### How It Works
 
@@ -210,7 +210,7 @@ Once you've saved a profile, any further EQ adjustments are **automatically save
 
 ## HDMI Volume Control
 
-macOS disables hardware volume control for HDMI audio outputs (TVs, monitors). SoundMax solves this with a software volume slider.
+macOS disables hardware volume control for HDMI audio outputs (TVs, monitors). SoundMaxx solves this with a software volume slider.
 
 ### When It Appears
 
@@ -248,8 +248,8 @@ The volume slider automatically appears when:
 
 ### System Integration
 
-- **Launch at Login**: Enable this to have SoundMax ready whenever you start your Mac
-- **Menu Bar Access**: SoundMax lives in your menu bar for quick access without cluttering your Dock
+- **Launch at Login**: Enable this to have SoundMaxx ready whenever you start your Mac
+- **Menu Bar Access**: SoundMaxx lives in your menu bar for quick access without cluttering your Dock
 
 ---
 
@@ -258,8 +258,8 @@ The volume slider automatically appears when:
 ### No Sound at All
 
 1. **Check system output**: System Settings → Sound → Output should be "BlackHole 2ch"
-2. **Check SoundMax status**: Should show green "Running" indicator
-3. **Check output device**: Make sure your actual speakers are selected in SoundMax
+2. **Check SoundMaxx status**: Should show green "Running" indicator
+3. **Check output device**: Make sure your actual speakers are selected in SoundMaxx
 4. **Restart audio**: Click Stop, wait a moment, click Start
 
 ### Sound Only From Some Apps
@@ -280,7 +280,7 @@ Set these apps to use "System Default" or "BlackHole 2ch".
 
 ### App Won't Open
 
-If macOS blocks SoundMax:
+If macOS blocks SoundMaxx:
 1. Right-click the app → **Open** → **Open**
 2. Or: System Settings → Privacy & Security → **Open Anyway**
 
@@ -288,8 +288,8 @@ If macOS blocks SoundMax:
 
 If you accidentally denied microphone access:
 1. Open **System Settings** → **Privacy & Security** → **Microphone**
-2. Find SoundMax and enable it
-3. Restart SoundMax
+2. Find SoundMaxx and enable it
+3. Restart SoundMaxx
 
 ### EQ Not Affecting Sound
 
@@ -301,30 +301,30 @@ If you accidentally denied microphone access:
 
 ## FAQ
 
-**Q: Why does SoundMax need microphone permission?**
-A: macOS treats any audio input as "microphone access" - SoundMax needs this to capture audio from BlackHole for processing.
+**Q: Why does SoundMaxx need microphone permission?**
+A: macOS treats any audio input as "microphone access" - SoundMaxx needs this to capture audio from BlackHole for processing.
 
-**Q: Will SoundMax affect call audio in Zoom/Teams/FaceTime?**
+**Q: Will SoundMaxx affect call audio in Zoom/Teams/FaceTime?**
 A: Only if those apps are set to output through BlackHole. For calls, it's usually better to set them to output directly to your speakers.
 
-**Q: Can I use SoundMax with AirPlay?**
-A: Yes! Select your AirPlay device as the output in SoundMax.
+**Q: Can I use SoundMaxx with AirPlay?**
+A: Yes! Select your AirPlay device as the output in SoundMaxx.
 
-**Q: Does SoundMax work with Bluetooth headphones?**
+**Q: Does SoundMaxx work with Bluetooth headphones?**
 A: Yes, select your Bluetooth headphones as the output device.
 
-**Q: How much CPU does SoundMax use?**
+**Q: How much CPU does SoundMaxx use?**
 A: Very little - typically less than 1% on Apple Silicon Macs.
 
-**Q: Can I use SoundMax with other audio apps like Logic Pro?**
-A: Professional audio apps typically have their own audio routing. You can use SoundMax alongside them, but you may want to route the DAW directly to your interface, not through BlackHole.
+**Q: Can I use SoundMaxx with other audio apps like Logic Pro?**
+A: Professional audio apps typically have their own audio routing. You can use SoundMaxx alongside them, but you may want to route the DAW directly to your interface, not through BlackHole.
 
 **Q: What's the audio latency?**
 A: Minimal - typically under 10ms, imperceptible for music listening. For recording or live monitoring, use your audio interface directly.
 
-**Q: How do I completely uninstall SoundMax?**
+**Q: How do I completely uninstall SoundMaxx?**
 A:
-1. Quit SoundMax
+1. Quit SoundMaxx
 2. Delete from Applications
 3. Optionally remove BlackHole: `brew uninstall blackhole-2ch`
 4. Reset system audio output to your speakers
@@ -333,9 +333,9 @@ A:
 
 ## Need Help?
 
-- **GitHub Issues**: [Report a bug or request a feature](https://github.com/snap-sites/SoundMax/issues)
-- **README**: [Technical documentation](https://github.com/snap-sites/SoundMax#readme)
+- **GitHub Issues**: [Report a bug or request a feature](https://github.com/snap-sites/SoundMaxx/issues)
+- **README**: [Technical documentation](https://github.com/snap-sites/SoundMaxx#readme)
 
 ---
 
-*SoundMax is free, open-source software released under the MIT License.*
+*SoundMaxx is free, open-source software released under the MIT License.*

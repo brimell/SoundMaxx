@@ -19,8 +19,8 @@ mkdir -p "$BUILD_DIR"
 # Build release version
 echo "Building release..."
 cd "$PROJECT_DIR"
-xcodebuild -project SoundMax.xcodeproj \
-    -scheme SoundMax \
+xcodebuild -project SoundMaxx.xcodeproj \
+    -scheme SoundMaxx \
     -configuration Release \
     -derivedDataPath "$BUILD_DIR/DerivedData" \
     clean build

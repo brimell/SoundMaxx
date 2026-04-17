@@ -690,8 +690,8 @@ struct ContentView: View {
 
     private func persistSelectedDevices() {
         settingsStore.update { settings in
-            settings.selectedInputDeviceID = selectedInputID
-            settings.selectedOutputDeviceID = selectedOutputID
+            settings.selectedInputDeviceID = selectedInputID.map { Int32($0) }
+            settings.selectedOutputDeviceID = selectedOutputID.map { Int32($0) }
         }
     }
 }

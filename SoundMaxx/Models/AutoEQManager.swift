@@ -82,7 +82,7 @@ class AutoEQManager: ObservableObject {
         }
 
         var request = URLRequest(url: url)
-        request.addValue("SoundMax", forHTTPHeaderField: "User-Agent")
+        request.addValue("SoundMaxx", forHTTPHeaderField: "User-Agent")
 
         session.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
@@ -142,7 +142,7 @@ class AutoEQManager: ObservableObject {
 
         var request = URLRequest(url: url)
         request.addValue("text/plain", forHTTPHeaderField: "Accept")
-        request.addValue("SoundMax", forHTTPHeaderField: "User-Agent")
+        request.addValue("SoundMaxx", forHTTPHeaderField: "User-Agent")
 
         session.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {

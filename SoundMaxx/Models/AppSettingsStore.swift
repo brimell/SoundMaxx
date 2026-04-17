@@ -65,7 +65,7 @@ struct AppSettings: Codable {
 class AppSettingsStore {
     static let shared = AppSettingsStore()
 
-    private let settingsKey = "SoundMax.AppSettings"
+    private let settingsKey = "SoundMaxx.AppSettings"
     private var cachedSettings: AppSettings?
 
     init() {

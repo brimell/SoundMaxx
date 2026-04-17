@@ -10,6 +10,7 @@ struct DeviceProfile: Codable, Identifiable {
     var eqBands: [Double]  // 10 bands, -12 to +12
     var parametricBands: [EQBand]?
     var preGain: Float     // -24.0 to +24.0
+    var autoStopClippingEnabled: Bool
     var volume: Float      // 0.0 to 1.0 (for HDMI/software volume)
     var isEQEnabled: Bool
 
@@ -19,6 +20,7 @@ struct DeviceProfile: Codable, Identifiable {
         eqBands: [Double] = Array(repeating: 0.0, count: 10),
         parametricBands: [EQBand]? = nil,
         preGain: Float = 0.0,
+        autoStopClippingEnabled: Bool = false,
         volume: Float = 1.0,
         isEQEnabled: Bool = true
     ) {
@@ -27,6 +29,7 @@ struct DeviceProfile: Codable, Identifiable {
         self.eqBands = eqBands
         self.parametricBands = parametricBands
         self.preGain = preGain
+        self.autoStopClippingEnabled = autoStopClippingEnabled
         self.volume = volume
         self.isEQEnabled = isEQEnabled
     }
@@ -44,6 +47,7 @@ struct DeviceProfile: Codable, Identifiable {
         case eqBands
         case parametricBands
         case preGain
+        case autoStopClippingEnabled
         case volume
         case isEQEnabled
     }
@@ -56,6 +60,7 @@ struct DeviceProfile: Codable, Identifiable {
         eqBands = try container.decodeIfPresent([Double].self, forKey: .eqBands) ?? Array(repeating: 0.0, count: 10)
         parametricBands = try container.decodeIfPresent([EQBand].self, forKey: .parametricBands)
         preGain = try container.decodeIfPresent(Float.self, forKey: .preGain) ?? 0.0
+        autoStopClippingEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoStopClippingEnabled) ?? false
         volume = try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0
         isEQEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEQEnabled) ?? true
     }
@@ -68,6 +73,7 @@ struct DeviceProfile: Codable, Identifiable {
         try container.encode(eqBands, forKey: .eqBands)
         try container.encode(parametricBands, forKey: .parametricBands)
         try container.encode(preGain, forKey: .preGain)
+        try container.encode(autoStopClippingEnabled, forKey: .autoStopClippingEnabled)
         try container.encode(volume, forKey: .volume)
         try container.encode(isEQEnabled, forKey: .isEQEnabled)
     }
@@ -80,7 +86,7 @@ class DeviceProfileManager: ObservableObject {
 
     @Published private(set) var profiles: [String: DeviceProfile] = [:]
 
-    private let profilesKey = "SoundMax.DeviceProfiles"
+    private let profilesKey = "SoundMaxx.DeviceProfiles"
 
     init() {
         loadProfiles()
@@ -103,6 +109,7 @@ class DeviceProfileManager: ObservableObject {
         eqBands: [Double],
         parametricBands: [EQBand],
         preGain: Float,
+        autoStopClippingEnabled: Bool,
         volume: Float,
         isEQEnabled: Bool
     ) {
@@ -112,6 +119,7 @@ class DeviceProfileManager: ObservableObject {
             eqBands: eqBands,
             parametricBands: parametricBands,
             preGain: preGain,
+            autoStopClippingEnabled: autoStopClippingEnabled,
             volume: volume,
             isEQEnabled: isEQEnabled
         )

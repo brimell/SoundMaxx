@@ -196,9 +196,9 @@ SoundMaxx attempts to match sample rates automatically. If issues persist:
 ## Project Structure
 
 ```
-SoundMax/
-├── SoundMax/
-│   ├── SoundMaxApp.swift            # App entry, menu bar setup
+SoundMaxx/
+├── SoundMaxx/
+│   ├── SoundMaxxApp.swift           # App entry, menu bar setup
 │   ├── ContentView.swift            # Main UI
 │   ├── Audio/
 │   │   ├── AudioEngine.swift        # Core Audio routing (AUHAL)
@@ -238,10 +238,10 @@ This creates a DMG installer in the `build/` directory.
 For signed distribution:
 ```bash
 # Sign the app
-codesign --deep --force --verify --verbose --sign "Developer ID Application: Your Name" build/DerivedData/Build/Products/Release/SoundMax.app
+codesign --deep --force --verify --verbose --sign "Developer ID Application: Your Name" build/DerivedData/Build/Products/Release/SoundMaxx.app
 
 # Notarize
-xcrun notarytool submit build/SoundMax-Installer.dmg --apple-id your@email.com --team-id TEAMID --password app-specific-password
+xcrun notarytool submit build/SoundMaxx-Installer.dmg --apple-id your@email.com --team-id TEAMID --password app-specific-password
 ```
 
 ## License

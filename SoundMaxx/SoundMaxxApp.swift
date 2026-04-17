@@ -2,7 +2,7 @@ import SwiftUI
 import AVFoundation
 
 @main
-struct SoundMaxApp: App {
+struct SoundMaxxApp: App {
     @StateObject private var audioEngine = AudioEngine()
     @StateObject private var eqModel = EQModel()
 
