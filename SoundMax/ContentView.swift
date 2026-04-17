@@ -574,11 +574,6 @@ struct ContentView: View {
             audioEngine.setInputDevice(blackhole.id)
         }
 
-        if selectedOutputID == nil, let defaultOutputID = deviceManager.getDefaultOutputDevice() {
-            selectedOutputID = defaultOutputID
-            audioEngine.setOutputDevice(defaultOutputID)
-        }
-
         if !audioEngine.isRunning,
            audioEngine.selectedInputDeviceID != nil,
            audioEngine.selectedOutputDeviceID != nil {
