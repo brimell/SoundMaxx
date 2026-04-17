@@ -249,6 +249,42 @@ SoundMaxx/
 
 This creates a DMG installer in the `build/` directory.
 
+## Publishing to GitHub Releases
+
+Use the publish script to build and upload the latest DMG to GitHub Releases.
+
+Prerequisites:
+
+```bash
+brew install gh
+gh auth login
+```
+
+Default usage (build + upload):
+
+```bash
+./scripts/publish-release.sh
+```
+
+Useful options:
+
+```bash
+# Upload an already-built DMG
+./scripts/publish-release.sh --skip-build
+
+# Override release metadata
+./scripts/publish-release.sh --tag v1.0.1 --title "SoundMaxx v1.0.1" --notes "Release notes here"
+
+# Publish to a specific repository
+./scripts/publish-release.sh --repo brimell/SoundMax
+```
+
+Behavior:
+
+- Uses `v<CFBundleShortVersionString>` as the default tag
+- Creates the release if it does not exist
+- Uploads/replaces the DMG asset if the release already exists
+
 For signed distribution:
 ```bash
 # Sign the app
