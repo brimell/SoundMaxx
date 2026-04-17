@@ -1,8 +1,8 @@
-# SoundMax
+# SoundMaxx
 
 A free, open-source macOS system-wide 10-band parametric equalizer.
 
-SoundMax sits in your menu bar and applies real-time EQ processing to all system audio, letting you fine-tune your listening experience across any app.
+SoundMaxx sits in your menu bar and applies real-time EQ processing to all system audio, letting you fine-tune your listening experience across any app.
 
 ## Features
 
@@ -28,7 +28,7 @@ SoundMax sits in your menu bar and applies real-time EQ processing to all system
 
 ### Step 1: Install BlackHole
 
-BlackHole is a free virtual audio driver that routes system audio through SoundMax.
+BlackHole is a free virtual audio driver that routes system audio through SoundMaxx.
 
 ```bash
 brew install blackhole-2ch
@@ -36,12 +36,12 @@ brew install blackhole-2ch
 
 Or download directly from [BlackHole Releases](https://github.com/ExistentialAudio/BlackHole/releases).
 
-### Step 2: Install SoundMax
+### Step 2: Install SoundMaxx
 
 **Option A: Download Release (Recommended)**
 
-1. Download the latest DMG from [Releases](https://github.com/snap-sites/SoundMax/releases)
-2. Open the DMG and drag SoundMax to Applications
+1. Download the latest DMG from [Releases](https://github.com/brimell/SoundMaxx/releases)
+2. Open the DMG and drag SoundMaxx to Applications
 3. If macOS blocks the app: Right-click → Open → Open
 
 **Option B: Build from Source**
@@ -57,7 +57,7 @@ brew install xcodegen
 git clone https://github.com/brimell/SoundMaxx.git
 cd SoundMaxx
 xcodegen generate
-xcodebuild -project SoundMax.xcodeproj -scheme SoundMax -configuration Release build
+xcodebuild -project SoundMaxx.xcodeproj -scheme SoundMaxx -configuration Release build
 ```
 
 ## Setup Guide
@@ -69,7 +69,7 @@ xcodebuild -project SoundMax.xcodeproj -scheme SoundMax -configuration Release b
    - Select **BlackHole 2ch**
    - This routes all system audio through BlackHole
 
-2. **Launch SoundMax**
+2. **Launch SoundMaxx**
    - Open from Applications or Spotlight
    - Look for the slider icon (☰) in the menu bar
    - Grant microphone access when prompted (required to capture audio from BlackHole)
@@ -86,7 +86,7 @@ xcodebuild -project SoundMax.xcodeproj -scheme SoundMax -configuration Release b
 
 ```
 ┌─────────────┐    ┌───────────┐    ┌──────────────┐    ┌─────────────┐
-│  Your Apps  │ →  │ BlackHole │ →  │   SoundMax   │ →  │  Speakers   │
+│  Your Apps  │ →  │ BlackHole │ →  │   SoundMaxx  │ →  │  Speakers   │
 │ (Spotify,   │    │   (2ch)   │    │  (EQ + DSP)  │    │ (Real Audio │
 │  YouTube)   │    │           │    │              │    │   Output)   │
 └─────────────┘    └───────────┘    └──────────────┘    └─────────────┘
@@ -120,11 +120,11 @@ Each band includes additional controls under the slider:
 
 ### Launch at Login
 
-Check the "Launch at Login" box to have SoundMax start automatically when you log in. This setting is managed through macOS Login Items.
+Check the "Launch at Login" box to have SoundMaxx start automatically when you log in. This setting is managed through macOS Login Items.
 
 ### Per-Device Profiles
 
-SoundMax automatically remembers your EQ settings for each output device:
+SoundMaxx automatically remembers your EQ settings for each output device:
 
 1. **First time with a device**: Adjust your EQ settings and click "Save Profile"
 2. **Returning to a device**: Your saved EQ enabled state, bands, and volume are automatically restored
@@ -137,7 +137,7 @@ You can delete a saved device profile at any time from the profile controls row.
 
 ### AutoEQ Headphone Correction
 
-SoundMax integrates with the [AutoEQ](https://github.com/jaakkopasanen/AutoEq) project to provide scientifically-measured frequency response corrections for popular headphones.
+SoundMaxx integrates with the [AutoEQ](https://github.com/jaakkopasanen/AutoEq) project to provide scientifically-measured frequency response corrections for popular headphones.
 
 1. Click the **headphones icon** (🎧) next to the preset menu
 2. Search for your headphones or browse the list
@@ -157,8 +157,8 @@ The correction curves are fetched from the AutoEQ database and converted to our 
 ### No Audio Output
 
 1. Verify BlackHole is set as system output in System Settings → Sound
-2. Check SoundMax shows "Running" status (green indicator)
-3. Ensure the correct output device is selected in SoundMax
+2. Check SoundMaxx shows "Running" status (green indicator)
+3. Ensure the correct output device is selected in SoundMaxx
 4. Try clicking Stop, then Start again
 
 ### No Sound from Specific Apps
@@ -167,10 +167,10 @@ Some apps have their own audio output settings. Check the app's preferences and 
 
 ### "Microphone Access" Prompt
 
-SoundMax requires microphone permission to capture audio from BlackHole. This is a macOS security requirement for any app that reads audio input.
+SoundMaxx requires microphone permission to capture audio from BlackHole. This is a macOS security requirement for any app that reads audio input.
 
 - Click **Allow** when prompted
-- If previously denied: System Settings → Privacy & Security → Microphone → Enable SoundMax
+- If previously denied: System Settings → Privacy & Security → Microphone → Enable SoundMaxx
 
 ### App Won't Open (Blocked by macOS)
 
@@ -187,11 +187,11 @@ For unsigned builds, macOS Gatekeeper may block the app:
 
 ### Sample Rate Mismatch Errors
 
-SoundMax attempts to match sample rates automatically. If issues persist:
+SoundMaxx attempts to match sample rates automatically. If issues persist:
 
 1. Open **Audio MIDI Setup** (in /Applications/Utilities)
 2. Set both BlackHole and your output device to the same sample rate
-3. Restart SoundMax
+3. Restart SoundMaxx
 
 ## Project Structure
 
