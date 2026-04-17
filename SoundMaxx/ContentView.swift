@@ -63,6 +63,10 @@ struct ContentView: View {
                 volumeControl
             }
 
+            if isCompactLayout {
+                compactOutputControl
+            }
+
             if !isCompactLayout {
                 Divider()
 
@@ -128,6 +132,29 @@ struct ContentView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(eqImportErrorMessage)
+        }
+    }
+
+    private var compactOutputControl: some View {
+        HStack {
+            Text("Output")
+                .foregroundColor(.secondary)
+                .frame(width: 50, alignment: .leading)
+
+            Picker("", selection: $selectedOutputID) {
+                Text("Select...").tag(nil as AudioDeviceID?)
+                ForEach(deviceManager.outputDevices) { device in
+                    Text(device.name).tag(device.id as AudioDeviceID?)
+                }
+            }
+            .labelsHidden()
+            .help("Choose the output device")
+            .onChange(of: selectedOutputID) { newDevice in
+                if let deviceID = newDevice {
+                    audioEngine.setOutputDevice(deviceID)
+                }
+                persistSelectedDevices()
+            }
         }
     }
 
