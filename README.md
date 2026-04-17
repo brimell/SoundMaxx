@@ -8,18 +8,23 @@ Project website: [https://brimell.github.io/SoundMaxx/](https://brimell.github.i
 
 ## Features
 
-- **10-Band Parametric EQ** - 32Hz to 16kHz with per-band frequency, gain, and Q control
+- **10-Band Parametric EQ (Expandable)** - Starts at 10 bands (32Hz to 16kHz) and supports adding/removing bands in Advanced Options
 - **7 Filter Types Per Band** - Peak, Low Shelf, High Shelf, Low Pass, High Pass, Notch, and Band Pass
 - **±12dB Slider Range** - Fast musical shaping with real-time visual feedback
+- **Real-time Response + Spectrum Views** - See both the computed EQ response and live post-EQ spectrum activity
+- **Dual Bypass Controls** - Separate "Audio" (full processing) and "EQ" (filters only) toggles for fast A/B checks
 - **Built-in Presets** - Flat, Bass Boost, Treble Boost, Vocal, Rock, Electronic, Acoustic
 - **Custom Presets** - Save and load your own EQ configurations
 - **Per-Device Profiles** - Save EQ per output device, auto-restore on switch, and auto-save ongoing tweaks
 - **Proper Gain Staging** - Separate headroom (-12 to 0 dB) and post-EQ volume (-40 to +40 dB)
 - **Limiter / Clip Guard** - Final output safety stage with configurable ceiling (default: -1 dBFS)
+- **Auto-Stop EQ Clipping** - Optional safeguard that automatically trims headroom if the EQ stage clips
 - **Output Safety Status** - Separate EQ-stage clipping and post-EQ output status (limited/clipping)
 - **HDMI Volume Control** - Software volume slider for HDMI outputs (macOS disables hardware control)
 - **Global Output Switch Shortcut** - Press Control+Option+Command+O to cycle to the next output device instantly
+- **Shortcut Target Selection** - Choose exactly which output devices are included in shortcut cycling
 - **AutoEQ Integration** - Search and apply headphone correction curves from [AutoEQ](https://github.com/jaakkopasanen/AutoEq)
+- **AutoEQ Text Import** - Import AutoEQ `ParametricEQ.txt` or `GraphicEQ.txt` files directly
 - **Quick Help Popover** - Built-in in-app guidance for setup and controls
 - **Menu Bar App** - Always accessible, no dock icon clutter
 - **Launch at Login** - Optional auto-start with your Mac
@@ -113,6 +118,20 @@ xcodebuild -project SoundMaxx.xcodeproj -scheme SoundMaxx -configuration Release
 | Center position | No change (0dB) |
 | Toggle switch | Enable/disable EQ processing |
 
+### Audio vs EQ Toggles
+
+- **Audio toggle**: Enables or bypasses the entire chain (headroom + EQ + output stages)
+- **EQ toggle**: Bypasses only EQ filters while keeping the rest of the chain active
+
+This makes it easier to run quick A/B checks without losing gain staging.
+
+### Real-time Visual Monitoring
+
+- **Response graph**: Shows the computed frequency response of your active band/filter setup
+- **Spectrum analyzer**: Shows live post-EQ spectrum activity in real time
+
+Use both together to correlate what you hear with what the processing is doing.
+
 ### Advanced Parametric Controls
 
 Each band includes additional controls under the slider:
@@ -120,6 +139,7 @@ Each band includes additional controls under the slider:
 - **Filter type menu**: Peak, LS, HS, LP, HP, Notch, BP
 - **Frequency field**: Set exact center/cutoff frequency (20Hz to 20kHz)
 - **Q field**: Set bandwidth/resonance for precise shaping
+- **Band add/remove controls**: Add a new band, remove the last band, or remove an individual band
 
 ### Presets
 
@@ -147,7 +167,21 @@ You can delete a saved device profile at any time from the profile controls row.
 
 ### Quick Output Device Shortcut
 
-Use the global shortcut **Control+Option+Command+O** to jump to the next available output device without opening the app UI. This also updates the saved output device so your selection persists.
+Use the global shortcut **Control+Option+Command+O** to jump to the next available output device without opening the app UI.
+
+- By default, it cycles through all outputs
+- In the **Targets** menu, you can limit cycling to specific outputs (for example: speakers + headphones only)
+- Shortcut switches also update your saved output device selection
+
+### Import AutoEQ Text Files
+
+In addition to browsing AutoEQ inside the app, you can import downloaded AutoEQ text files:
+
+1. Click the **import icon** next to the preset and AutoEQ buttons
+2. Select an AutoEQ `ParametricEQ.txt` file (or `GraphicEQ.txt`)
+3. SoundMaxx parses and applies the curve to your current EQ
+
+This is useful when sharing tuned files or testing custom AutoEQ exports.
 
 ### AutoEQ Headphone Correction
 
