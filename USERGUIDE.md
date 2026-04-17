@@ -135,7 +135,7 @@ SoundMaxx uses a proper gain chain:
 
 - **Headroom**: pre-EQ safety control, range **-12 dB to 0 dB**. Keep this at or below 0 dB.
 - **Volume**: post-EQ loudness control, range **-40 dB to +40 dB**.
-- **Limiter**: final clip guard with configurable ceiling (default -1 dBFS).
+- **Limiter**: final clip guard (default OFF; ceiling defaults to -1 dBFS when enabled).
 
 Output safety indicators are shown in the app:
 - **EQ stage clipping**: clipping before post-EQ volume/limiter.
