@@ -6,6 +6,7 @@ struct AutoEQView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var searchText = ""
+    @State private var showFavoritesOnly = false
     @State private var selectedHeadphone: AutoEQHeadphone?
     @FocusState private var isSearchFocused: Bool
 
@@ -14,6 +15,20 @@ struct AutoEQView: View {
             header
 
             searchField
+
+            optionsRow
+
+            if let info = autoEQManager.infoMessage {
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(info)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+            }
 
             if autoEQManager.isLoading {
                 loadingView
@@ -93,6 +108,21 @@ struct AutoEQView: View {
         .help("Type to search for your headphones")
     }
 
+    private var optionsRow: some View {
+        HStack {
+            Toggle("Favorites only", isOn: $showFavoritesOnly)
+                .toggleStyle(.switch)
+                .font(.caption)
+                .help("Show only starred headphones")
+
+            Spacer()
+
+            Text("\(filteredHeadphones.count) results")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+    }
+
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView()
@@ -121,10 +151,26 @@ struct AutoEQView: View {
         .frame(maxHeight: .infinity)
     }
 
+    private var filteredHeadphones: [AutoEQHeadphone] {
+        guard showFavoritesOnly else {
+            return autoEQManager.searchResults
+        }
+
+        return autoEQManager.searchResults.filter { autoEQManager.isFavorite($0) }
+    }
+
+    private var emptyStateHint: String {
+        if showFavoritesOnly {
+            return "Star headphones in the list to save favorites"
+        }
+
+        return searchText.isEmpty ? "Check your network connection and try again" : "Try a different search term"
+    }
+
     private var headphoneList: some View {
         ScrollView {
             LazyVStack(spacing: 2) {
-                let headphones = autoEQManager.searchResults
+                let headphones = filteredHeadphones
 
                 if headphones.isEmpty {
                     VStack(spacing: 8) {
@@ -134,7 +180,7 @@ struct AutoEQView: View {
                         Text(searchText.isEmpty ? "No AutoEQ headphones available" : "No headphones found")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Text(searchText.isEmpty ? "Check your network connection and try again" : "Try a different search term")
+                        Text(emptyStateHint)
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -151,43 +197,55 @@ struct AutoEQView: View {
     }
 
     private func headphoneRow(_ headphone: AutoEQHeadphone) -> some View {
-        Button {
-            selectedHeadphone = headphone
-            applyAutoEQ(headphone)
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(headphone.name)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.primary)
+        HStack(spacing: 8) {
+            Button {
+                selectedHeadphone = headphone
+                applyAutoEQ(headphone)
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(headphone.name)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.primary)
 
-                    HStack(spacing: 4) {
-                        Text(headphone.displayType)
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                        Text("•")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary.opacity(0.5))
-                        Text(headphone.sourceDisplayName)
-                            .font(.system(size: 10))
-                            .foregroundColor(.orange.opacity(0.8))
+                        HStack(spacing: 4) {
+                            Text(headphone.displayType)
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                            Text("•")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary.opacity(0.5))
+                            Text(headphone.sourceDisplayName)
+                                .font(.system(size: 10))
+                                .foregroundColor(.orange.opacity(0.8))
+                        }
+                    }
+
+                    Spacer()
+
+                    if selectedHeadphone?.id == headphone.id {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
                     }
                 }
-
-                Spacer()
-
-                if selectedHeadphone?.id == headphone.id {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(selectedHeadphone?.id == headphone.id ? Color.accentColor.opacity(0.1) : Color.clear)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(selectedHeadphone?.id == headphone.id ? Color.accentColor.opacity(0.1) : Color.clear)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .help("Click to apply \(headphone.name) correction curve")
+
+            Button {
+                autoEQManager.toggleFavorite(headphone)
+            } label: {
+                Image(systemName: autoEQManager.isFavorite(headphone) ? "star.fill" : "star")
+                    .foregroundColor(autoEQManager.isFavorite(headphone) ? .yellow : .secondary)
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 8)
+            .help(autoEQManager.isFavorite(headphone) ? "Remove favorite" : "Add favorite")
         }
-        .buttonStyle(.plain)
-        .help("Click to apply \(headphone.name) correction curve")
     }
 
     private var footer: some View {

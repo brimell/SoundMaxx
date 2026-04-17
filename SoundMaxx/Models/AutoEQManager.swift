@@ -10,7 +10,9 @@ class AutoEQManager: ObservableObject {
 
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var infoMessage: String?
     @Published var searchResults: [AutoEQHeadphone] = []
+    @Published private(set) var favoriteHeadphoneIDs: Set<String> = []
 
     // Our 10 fixed frequency bands
     static let targetFrequencies: [Double] = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
@@ -19,9 +21,13 @@ class AutoEQManager: ObservableObject {
     private var allHeadphones: [AutoEQHeadphone] = []
     private var currentQuery = ""
     private var hasLoadedIndex = false
+    private let cachedIndexKey = "SoundMaxx.AutoEQ.cachedIndex.v1"
+    private let favoritesKey = "SoundMaxx.AutoEQ.favorites.v1"
+    private let curveCachePrefix = "SoundMaxx.AutoEQ.curve.v1."
 
     private init(session: URLSession = .shared) {
         self.session = session
+        loadFavorites()
     }
 
     // MARK: - Search
@@ -67,11 +73,26 @@ class AutoEQManager: ObservableObject {
         }
     }
 
+    func isFavorite(_ headphone: AutoEQHeadphone) -> Bool {
+        favoriteHeadphoneIDs.contains(headphone.id)
+    }
+
+    func toggleFavorite(_ headphone: AutoEQHeadphone) {
+        if favoriteHeadphoneIDs.contains(headphone.id) {
+            favoriteHeadphoneIDs.remove(headphone.id)
+        } else {
+            favoriteHeadphoneIDs.insert(headphone.id)
+        }
+
+        persistFavorites()
+    }
+
     // MARK: - Fetch EQ Data
 
     func fetchEQ(for headphone: AutoEQHeadphone, completion: @escaping (Result<AutoEQCurve, Error>) -> Void) {
         isLoading = true
         errorMessage = nil
+        infoMessage = nil
 
         fetchText(at: headphone.parametricEQURL) { [weak self] parametricResult in
             guard let self = self else { return }
@@ -80,6 +101,7 @@ class AutoEQManager: ObservableObject {
             case .success(let content):
                 do {
                     let curve = try self.parseParametricEQ(content)
+                    self.cacheCurve(curve, for: headphone)
                     self.isLoading = false
                     completion(.success(curve))
                 } catch {
@@ -110,15 +132,26 @@ class AutoEQManager: ObservableObject {
             case .success(let content):
                 do {
                     let curve = try self.parseGraphicEQ(content)
+                    self.cacheCurve(curve, for: headphone)
                     completion(.success(curve))
                 } catch {
-                    self.errorMessage = "Could not parse EQ data"
-                    completion(.failure(error))
+                    if let cachedCurve = self.loadCachedCurve(for: headphone) {
+                        self.infoMessage = "Using cached EQ for \(headphone.name)."
+                        completion(.success(cachedCurve))
+                    } else {
+                        self.errorMessage = "Could not parse EQ data"
+                        completion(.failure(error))
+                    }
                 }
 
             case .failure(let error):
-                self.errorMessage = error.localizedDescription
-                completion(.failure(error))
+                if let cachedCurve = self.loadCachedCurve(for: headphone) {
+                    self.infoMessage = "Using cached EQ for \(headphone.name)."
+                    completion(.success(cachedCurve))
+                } else {
+                    self.errorMessage = error.localizedDescription
+                    completion(.failure(error))
+                }
             }
         }
     }
@@ -166,6 +199,7 @@ class AutoEQManager: ObservableObject {
     private func fetchHeadphoneIndex() {
         isLoading = true
         errorMessage = nil
+        infoMessage = nil
 
         guard let url = URL(string: "https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results/INDEX.md") else {
             isLoading = false
@@ -186,23 +220,31 @@ class AutoEQManager: ObservableObject {
                 self.isLoading = false
 
                 if let error = error {
-                    self.errorMessage = "Could not load AutoEQ index: \(error.localizedDescription)"
+                    if !self.loadCachedHeadphoneIndex(withMessage: "Could not refresh AutoEQ catalog. Using cached list.") {
+                        self.errorMessage = "Could not load AutoEQ index: \(error.localizedDescription)"
+                    }
                     return
                 }
 
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    self.errorMessage = "Invalid AutoEQ index response"
+                    if !self.loadCachedHeadphoneIndex(withMessage: "AutoEQ catalog response was invalid. Using cached list.") {
+                        self.errorMessage = "Invalid AutoEQ index response"
+                    }
                     return
                 }
 
                 guard (200 ... 299).contains(httpResponse.statusCode) else {
-                    self.errorMessage = "Could not load AutoEQ index (\(httpResponse.statusCode))"
+                    if !self.loadCachedHeadphoneIndex(withMessage: "AutoEQ catalog is unavailable. Using cached list.") {
+                        self.errorMessage = "Could not load AutoEQ index (\(httpResponse.statusCode))"
+                    }
                     return
                 }
 
                 guard let data = data,
                       let content = String(data: data, encoding: .utf8) else {
-                    self.errorMessage = "AutoEQ index response was empty"
+                    if !self.loadCachedHeadphoneIndex(withMessage: "AutoEQ catalog was empty. Using cached list.") {
+                        self.errorMessage = "AutoEQ index response was empty"
+                    }
                     return
                 }
 
@@ -214,6 +256,7 @@ class AutoEQManager: ObservableObject {
                 self.allHeadphones = unique.sorted(by: Self.sortHeadphones(_:_:))
                 self.hasLoadedIndex = true
                 self.search(query: self.currentQuery)
+                self.cacheHeadphoneIndex(self.allHeadphones)
 
                 if self.allHeadphones.isEmpty {
                     self.errorMessage = "No AutoEQ headphones were found"
@@ -323,6 +366,67 @@ class AutoEQManager: ObservableObject {
         }
 
         return joined
+    }
+
+    // MARK: - Persistence
+
+    private func loadFavorites() {
+        let storedIDs = UserDefaults.standard.stringArray(forKey: favoritesKey) ?? []
+        favoriteHeadphoneIDs = Set(storedIDs)
+    }
+
+    private func persistFavorites() {
+        let sortedIDs = favoriteHeadphoneIDs.sorted()
+        UserDefaults.standard.set(sortedIDs, forKey: favoritesKey)
+    }
+
+    private func loadCachedHeadphoneIndex(withMessage message: String) -> Bool {
+        guard let data = UserDefaults.standard.data(forKey: cachedIndexKey),
+              let cachedHeadphones = try? JSONDecoder().decode([AutoEQHeadphone].self, from: data),
+              !cachedHeadphones.isEmpty else {
+            return false
+        }
+
+        allHeadphones = cachedHeadphones.sorted(by: Self.sortHeadphones(_:_:))
+        hasLoadedIndex = true
+        search(query: currentQuery)
+        infoMessage = message
+        errorMessage = nil
+        return true
+    }
+
+    private func cacheHeadphoneIndex(_ headphones: [AutoEQHeadphone]) {
+        guard let encoded = try? JSONEncoder().encode(headphones) else {
+            return
+        }
+
+        UserDefaults.standard.set(encoded, forKey: cachedIndexKey)
+    }
+
+    private func cacheCurve(_ curve: AutoEQCurve, for headphone: AutoEQHeadphone) {
+        guard let encoded = try? JSONEncoder().encode(curve) else {
+            return
+        }
+
+        UserDefaults.standard.set(encoded, forKey: curveCacheKey(for: headphone.id))
+    }
+
+    private func loadCachedCurve(for headphone: AutoEQHeadphone) -> AutoEQCurve? {
+        guard let data = UserDefaults.standard.data(forKey: curveCacheKey(for: headphone.id)) else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(AutoEQCurve.self, from: data)
+    }
+
+    private func curveCacheKey(for headphoneID: String) -> String {
+        let encodedID = Data(headphoneID.utf8)
+            .base64EncodedString()
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "=", with: "")
+
+        return curveCachePrefix + encodedID
     }
 
     // MARK: - Parse GraphicEQ Format
@@ -542,7 +646,7 @@ class AutoEQManager: ObservableObject {
 
 // MARK: - Models
 
-struct AutoEQHeadphone: Identifiable, Hashable {
+struct AutoEQHeadphone: Identifiable, Hashable, Codable {
     let id: String
     let name: String
     let source: String
@@ -604,7 +708,7 @@ struct AutoEQHeadphone: Identifiable, Hashable {
     }
 }
 
-struct AutoEQCurve {
+struct AutoEQCurve: Codable {
     let bands: [Float]
     let preGain: Float
     let parametricBands: [EQBand]?
