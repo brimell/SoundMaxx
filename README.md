@@ -20,6 +20,7 @@ Project website: [https://brimell.github.io/SoundMaxx/](https://brimell.github.i
 - **Limiter / Clip Guard** - Final output safety stage with configurable ceiling (default: -1 dBFS)
 - **Auto-Stop EQ Clipping** - Optional safeguard that automatically trims headroom if the EQ stage clips
 - **Output Safety Status** - Separate EQ-stage clipping and post-EQ output status (limited/clipping)
+- **Peak-Hold Safety Meters** - Live EQ/output dBFS with held peaks and one-click meter reset
 - **HDMI Volume Control** - Software volume slider for HDMI outputs (macOS disables hardware control)
 - **Global Output Switch Shortcut** - Press Control+Option+Command+O to cycle to the next output device instantly
 - **Shortcut Target Selection** - Choose exactly which output devices are included in shortcut cycling
@@ -291,8 +292,41 @@ Prerequisites:
 
 ```bash
 brew install gh
-gh auth login
 ```
+
+### Configure with `.env` (Recommended)
+
+Copy the example file and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Common fields:
+
+- `GITHUB_REPOSITORY` (for example `brimell/SoundMax`)
+- `GH_TOKEN` or `GITHUB_TOKEN` (optional if `gh auth login` is already set up)
+- `RELEASE_TAG`, `RELEASE_TITLE`, `RELEASE_NOTES`
+- `RELEASE_SKIP_BUILD=true` if you want upload-only by default
+
+Then run:
+
+```bash
+./scripts/publish-release.sh
+```
+
+Optional: use a different env file:
+
+```bash
+./scripts/publish-release.sh --env-file .env.release
+```
+
+### CLI + Auth Notes
+
+You can authenticate either by:
+
+- Running `gh auth login`, or
+- Providing `GH_TOKEN` / `GITHUB_TOKEN` in your `.env`
 
 Default usage (build + upload):
 

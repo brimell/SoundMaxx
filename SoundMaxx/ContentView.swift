@@ -590,6 +590,17 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
             }
             .help("Post-EQ limiter activity and final output clipping monitor.")
+
+            HStack {
+                Spacer()
+
+                Button("Clear Meters") {
+                    audioEngine.clearSafetyMeters()
+                }
+                .buttonStyle(.borderless)
+                .font(.caption2)
+                .help("Reset current and peak-hold safety meters.")
+            }
         }
     }
 
@@ -726,15 +737,34 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
             }
             .help("Post-EQ limiter activity and final output clipping monitor.")
+
+            HStack {
+                Spacer()
+
+                Button("Clear Meters") {
+                    audioEngine.clearSafetyMeters()
+                }
+                .buttonStyle(.borderless)
+                .font(.caption2)
+                .help("Reset current and peak-hold safety meters.")
+            }
         }
     }
 
     private var eqPeakLabel: String {
-        peakLabel(from: audioEngine.eqStagePeakSample, prefix: "EQ")
+        meterLabel(
+            current: audioEngine.eqStagePeakSample,
+            hold: audioEngine.eqStagePeakHoldSample,
+            prefix: "EQ"
+        )
     }
 
     private var outputPeakLabel: String {
-        peakLabel(from: audioEngine.outputPeakSample, prefix: "Out")
+        meterLabel(
+            current: audioEngine.outputPeakSample,
+            hold: audioEngine.outputPeakHoldSample,
+            prefix: "Out"
+        )
     }
 
     private var outputStatusText: String {
@@ -767,14 +797,21 @@ struct ContentView: View {
         return Color.secondary.opacity(0.28)
     }
 
-    private func peakLabel(from peak: Float, prefix: String) -> String {
-        guard peak > 0 else { return "\(prefix) -inf dBFS" }
+    private func meterLabel(current: Float, hold: Float, prefix: String) -> String {
+        let currentDB = dbfsString(from: current)
+        let holdDB = dbfsString(from: hold)
+        return "\(prefix) \(currentDB) (pk \(holdDB))"
+    }
+
+    private func dbfsString(from peak: Float) -> String {
+        guard peak > 0 else { return "-inf dBFS" }
 
         let dBFS = 20.0 * log10(Double(peak))
         if dBFS >= 0 {
-            return String(format: "\(prefix) +%.1f dBFS", dBFS)
+            return String(format: "+%.1f dBFS", dBFS)
         }
-        return String(format: "\(prefix) %.1f dBFS", dBFS)
+
+        return String(format: "%.1f dBFS", dBFS)
     }
 
     private var presetControls: some View {
