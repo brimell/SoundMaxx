@@ -6,16 +6,18 @@ SoundMax sits in your menu bar and applies real-time EQ processing to all system
 
 ## Features
 
-- **10-Band Parametric EQ** - 32Hz, 64Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, 16kHz
-- **±12dB Per Band** - Precise control with professional biquad filtering
+- **10-Band Parametric EQ** - 32Hz to 16kHz with per-band frequency, gain, and Q control
+- **7 Filter Types Per Band** - Peak, Low Shelf, High Shelf, Low Pass, High Pass, Notch, and Band Pass
+- **±12dB Slider Range** - Fast musical shaping with real-time visual feedback
 - **Built-in Presets** - Flat, Bass Boost, Treble Boost, Vocal, Rock, Electronic, Acoustic
 - **Custom Presets** - Save and load your own EQ configurations
-- **Per-Device Profiles** - Automatically save and restore EQ settings for each output device
+- **Per-Device Profiles** - Save EQ per output device, auto-restore on switch, and auto-save ongoing tweaks
 - **HDMI Volume Control** - Software volume slider for HDMI outputs (macOS disables hardware control)
-- **AutoEQ Integration** - One-click headphone correction for 150+ popular headphones (via [AutoEQ](https://github.com/jaakkopasanen/AutoEq))
+- **AutoEQ Integration** - Search and apply headphone correction curves from [AutoEQ](https://github.com/jaakkopasanen/AutoEq)
+- **Quick Help Popover** - Built-in in-app guidance for setup and controls
 - **Menu Bar App** - Always accessible, no dock icon clutter
 - **Launch at Login** - Optional auto-start with your Mac
-- **Device Flexibility** - Works with various audio interfaces and sample rates
+- **Sample Rate Handling** - Attempts automatic sample-rate matching across input/output devices
 
 ## Requirements
 
@@ -101,6 +103,14 @@ xcodebuild -project SoundMax.xcodeproj -scheme SoundMax -configuration Release b
 | Center position | No change (0dB) |
 | Toggle switch | Enable/disable EQ processing |
 
+### Advanced Parametric Controls
+
+Each band includes additional controls under the slider:
+
+- **Filter type menu**: Peak, LS, HS, LP, HP, Notch, BP
+- **Frequency field**: Set exact center/cutoff frequency (20Hz to 20kHz)
+- **Q field**: Set bandwidth/resonance for precise shaping
+
 ### Presets
 
 - **Select Preset**: Use the dropdown menu to choose built-in or custom presets
@@ -117,10 +127,13 @@ Check the "Launch at Login" box to have SoundMax start automatically when you lo
 SoundMax automatically remembers your EQ settings for each output device:
 
 1. **First time with a device**: Adjust your EQ settings and click "Save Profile"
-2. **Returning to a device**: Your saved EQ and volume settings are automatically restored
-3. **HDMI displays**: A software volume slider appears since macOS disables hardware volume control for HDMI
+2. **Returning to a device**: Your saved EQ enabled state, bands, and volume are automatically restored
+3. **After saving once**: Further changes are auto-saved to that device profile
+4. **HDMI displays**: A software volume slider appears since macOS disables hardware volume control for HDMI
 
 This is perfect for users who switch between headphones, speakers, and HDMI displays with different audio characteristics.
+
+You can delete a saved device profile at any time from the profile controls row.
 
 ### AutoEQ Headphone Correction
 
@@ -185,20 +198,23 @@ SoundMax attempts to match sample rates automatically. If issues persist:
 ```
 SoundMax/
 ├── SoundMax/
-│   ├── SoundMaxApp.swift           # App entry, menu bar setup
-│   ├── ContentView.swift           # Main UI
+│   ├── SoundMaxApp.swift            # App entry, menu bar setup
+│   ├── ContentView.swift            # Main UI
 │   ├── Audio/
-│   │   ├── AudioEngine.swift       # Core Audio routing (AUHAL)
-│   │   └── BiquadFilter.swift      # Parametric EQ DSP
+│   │   ├── AudioEngine.swift        # Core Audio routing (AUHAL)
+│   │   └── BiquadFilter.swift       # Parametric EQ DSP
 │   ├── Models/
-│   │   ├── EQModel.swift           # EQ state management
-│   │   ├── EQPreset.swift          # Preset definitions
+│   │   ├── EQModel.swift            # EQ state management
+│   │   ├── EQPreset.swift           # Preset definitions
 │   │   ├── AudioDeviceManager.swift # Device enumeration
-│   │   └── LaunchAtLogin.swift     # Login item management
+│   │   ├── AutoEQManager.swift      # AutoEQ catalog/search/fetch
+│   │   ├── DeviceProfile.swift      # Per-device profile persistence
+│   │   └── LaunchAtLogin.swift      # Login item management
 │   └── Views/
-│       └── EQSliderView.swift      # Custom EQ slider
+│       ├── EQSliderView.swift       # Custom EQ slider
+│       └── AutoEQView.swift         # AutoEQ search/apply UI
 ├── scripts/
-│   └── build-release.sh            # DMG build script
+│   └── build-release.sh             # DMG build script
 ├── project.yml                      # XcodeGen configuration
 └── README.md
 ```
@@ -206,7 +222,7 @@ SoundMax/
 ## Technical Details
 
 - **Audio Framework**: Core Audio with AudioToolbox AUHAL units
-- **DSP**: Biquad filters implementing peaking EQ (from Audio EQ Cookbook)
+- **DSP**: Biquad filters implementing peak, shelf, pass, notch, and band-pass EQ (Audio EQ Cookbook)
 - **UI**: SwiftUI with MenuBarExtra
 - **Audio Format**: 32-bit float, non-interleaved stereo
 - **Latency**: Minimal (256-512 sample buffer)
