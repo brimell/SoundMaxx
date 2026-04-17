@@ -43,8 +43,7 @@ class AutoEQManager: ObservableObject {
         }
 
         guard !currentQuery.isEmpty else {
-            // Keep the default list bounded for a responsive UI.
-            searchResults = Array(allHeadphones.prefix(300))
+            searchResults = allHeadphones
             return
         }
 
@@ -135,14 +134,14 @@ class AutoEQManager: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        guard let url = URL(string: "https://api.github.com/repos/jaakkopasanen/AutoEq/git/trees/master?recursive=1") else {
+        guard let url = URL(string: "https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results/INDEX.md") else {
             isLoading = false
             errorMessage = "Invalid AutoEQ index URL"
             return
         }
 
         var request = URLRequest(url: url)
-        request.addValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.addValue("text/plain", forHTTPHeaderField: "Accept")
         request.addValue("SoundMax", forHTTPHeaderField: "User-Agent")
 
         session.dataTask(with: request) { [weak self] data, response, error in
@@ -168,30 +167,87 @@ class AutoEQManager: ObservableObject {
                     return
                 }
 
-                guard let data = data else {
+                guard let data = data,
+                      let content = String(data: data, encoding: .utf8) else {
                     self.errorMessage = "AutoEQ index response was empty"
                     return
                 }
 
-                do {
-                    let payload = try JSONDecoder().decode(GitTreeResponse.self, from: data)
-                    let parsed = payload.tree.compactMap(Self.makeHeadphone(from:))
+                let parsed = Self.makeHeadphones(fromIndexMarkdown: content)
 
-                    let unique = Dictionary(grouping: parsed, by: { $0.graphicEQPath })
-                        .compactMap { $0.value.first }
+                let unique = Dictionary(grouping: parsed, by: { $0.graphicEQPath })
+                    .compactMap { $0.value.first }
 
-                    self.allHeadphones = unique.sorted(by: Self.sortHeadphones(_:_:))
-                    self.hasLoadedIndex = true
-                    self.search(query: self.currentQuery)
+                self.allHeadphones = unique.sorted(by: Self.sortHeadphones(_:_:))
+                self.hasLoadedIndex = true
+                self.search(query: self.currentQuery)
 
-                    if self.allHeadphones.isEmpty {
-                        self.errorMessage = "No AutoEQ headphones were found"
-                    }
-                } catch {
-                    self.errorMessage = "Could not parse AutoEQ index"
+                if self.allHeadphones.isEmpty {
+                    self.errorMessage = "No AutoEQ headphones were found"
                 }
             }
         }.resume()
+    }
+
+    private static func makeHeadphones(fromIndexMarkdown content: String) -> [AutoEQHeadphone] {
+        var headphones: [AutoEQHeadphone] = []
+
+        for line in content.components(separatedBy: .newlines) {
+            guard let relativePath = extractPathFromIndexLine(line) else {
+                continue
+            }
+
+            let encodedComponents = relativePath
+                .split(separator: "/")
+                .map(String.init)
+
+            guard encodedComponents.count >= 2 else {
+                continue
+            }
+
+            let decodedComponents = encodedComponents.map { component in
+                component.removingPercentEncoding ?? component
+            }
+
+            let source = decodedComponents[0]
+            let name = decodedComponents[decodedComponents.count - 1]
+            let middleSegments = Array(decodedComponents[1 ..< (decodedComponents.count - 1)])
+            let type = detectType(in: middleSegments) ?? detectType(in: [name]) ?? "unknown"
+            let sourceVariant = normalizeSourceVariant(middleSegments, detectedType: type)
+
+            let folderPath = (["results"] + decodedComponents).joined(separator: "/")
+            let graphicEQPath = "\(folderPath)/\(name) GraphicEQ.txt"
+
+            headphones.append(
+                AutoEQHeadphone(
+                    name: name,
+                    source: source,
+                    type: type,
+                    sourceVariant: sourceVariant,
+                    graphicEQPath: graphicEQPath
+                )
+            )
+        }
+
+        return headphones
+    }
+
+    private static func extractPathFromIndexLine(_ line: String) -> String? {
+        guard line.hasPrefix("- [") else {
+            return nil
+        }
+
+        guard let markerRange = line.range(of: "](./") else {
+            return nil
+        }
+
+        let pathStart = markerRange.upperBound
+        guard let pathEnd = line[pathStart...].firstIndex(of: ")") else {
+            return nil
+        }
+
+        let path = String(line[pathStart ..< pathEnd])
+        return path.isEmpty ? nil : path
     }
 
     private static func sortHeadphones(_ lhs: AutoEQHeadphone, _ rhs: AutoEQHeadphone) -> Bool {
@@ -208,39 +264,6 @@ class AutoEQManager: ObservableObject {
         }
 
         return lhs.type.localizedCaseInsensitiveCompare(rhs.type) == .orderedAscending
-    }
-
-    private static func makeHeadphone(from treeItem: GitTreeItem) -> AutoEQHeadphone? {
-        guard treeItem.type == "blob" else {
-            return nil
-        }
-
-        guard treeItem.path.hasPrefix("results/") else {
-            return nil
-        }
-
-        guard treeItem.path.hasSuffix(" GraphicEQ.txt") else {
-            return nil
-        }
-
-        let components = treeItem.path.split(separator: "/").map(String.init)
-        guard components.count >= 4, components[0] == "results" else {
-            return nil
-        }
-
-        let source = components[1]
-        let name = components[components.count - 2]
-        let middleSegments = Array(components[2 ..< (components.count - 2)])
-        let type = detectType(in: middleSegments) ?? detectType(in: [name]) ?? "unknown"
-        let sourceVariant = normalizeSourceVariant(middleSegments, detectedType: type)
-
-        return AutoEQHeadphone(
-            name: name,
-            source: source,
-            type: type,
-            sourceVariant: sourceVariant,
-            graphicEQPath: treeItem.path
-        )
     }
 
     private static func detectType(in segments: [String]) -> String? {
@@ -424,15 +447,6 @@ struct AutoEQHeadphone: Identifiable, Hashable {
 struct AutoEQCurve {
     let bands: [Float]
     let preGain: Float
-}
-
-private struct GitTreeResponse: Decodable {
-    let tree: [GitTreeItem]
-}
-
-private struct GitTreeItem: Decodable {
-    let path: String
-    let type: String
 }
 
 // MARK: - Errors
