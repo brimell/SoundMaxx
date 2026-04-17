@@ -21,6 +21,23 @@ class AudioDeviceManager: ObservableObject {
         inputDevices = getDevices(forInput: true)
     }
 
+    func nextOutputDevice(after currentDeviceID: AudioDeviceID?) -> AudioDevice? {
+        refreshDevices()
+        guard !outputDevices.isEmpty else { return nil }
+
+        guard let currentDeviceID,
+              let currentIndex = outputDevices.firstIndex(where: { $0.id == currentDeviceID }) else {
+            return outputDevices.first
+        }
+
+        let nextIndex = outputDevices.index(after: currentIndex)
+        if nextIndex == outputDevices.endIndex {
+            return outputDevices.first
+        }
+
+        return outputDevices[nextIndex]
+    }
+
     func getDevices(forInput isInput: Bool) -> [AudioDevice] {
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,

@@ -18,6 +18,7 @@ Project website: [https://brimell.github.io/SoundMax/](https://brimell.github.io
 - **Limiter / Clip Guard** - Final output safety stage with configurable ceiling (default: -1 dBFS)
 - **Dual Clip Meters** - Independent EQ-stage and output-stage clipping indicators
 - **HDMI Volume Control** - Software volume slider for HDMI outputs (macOS disables hardware control)
+- **Global Output Switch Shortcut** - Press Control+Option+Command+O to cycle to the next output device instantly
 - **AutoEQ Integration** - Search and apply headphone correction curves from [AutoEQ](https://github.com/jaakkopasanen/AutoEq)
 - **Quick Help Popover** - Built-in in-app guidance for setup and controls
 - **Menu Bar App** - Always accessible, no dock icon clutter
@@ -143,6 +144,10 @@ SoundMaxx automatically remembers your EQ settings for each output device:
 This is perfect for users who switch between headphones, speakers, and HDMI displays with different audio characteristics.
 
 You can delete a saved device profile at any time from the profile controls row.
+
+### Quick Output Device Shortcut
+
+Use the global shortcut **Control+Option+Command+O** to jump to the next available output device without opening the app UI. This also updates the saved output device so your selection persists.
 
 ### AutoEQ Headphone Correction
 

@@ -92,6 +92,16 @@ struct ContentView: View {
                 didInitialStartup = true
             }
         }
+        .onReceive(audioEngine.$selectedInputDeviceID) { newDeviceID in
+            if selectedInputID != newDeviceID {
+                selectedInputID = newDeviceID
+            }
+        }
+        .onReceive(audioEngine.$selectedOutputDeviceID) { newDeviceID in
+            if selectedOutputID != newDeviceID {
+                selectedOutputID = newDeviceID
+            }
+        }
         .onChange(of: eqModel.parametricBands) { newValue in
             audioEngine.setBands(newValue)
         }
@@ -155,6 +165,14 @@ struct ContentView: View {
                 }
                 persistSelectedDevices()
             }
+
+            Button {
+                cycleToNextOutputDevice()
+            } label: {
+                Image(systemName: "arrow.triangle.2.circlepath")
+            }
+            .buttonStyle(.borderless)
+            .help("Switch to next output device (Control+Option+Command+O)")
         }
     }
 
@@ -242,6 +260,7 @@ struct ContentView: View {
                 helpRow(icon: "square.and.arrow.down", title: "Presets", desc: "Select or save EQ configurations")
                 helpRow(icon: "headphones", title: "AutoEQ", desc: "Apply headphone correction curves")
                 helpRow(icon: "hifispeaker", title: "Device Profiles", desc: "EQ settings saved per output device")
+                helpRow(icon: "keyboard", title: "Output Shortcut", desc: "Control+Option+Command+O switches to next output")
                 helpRow(icon: "power", title: "Start/Stop", desc: "Toggle audio processing")
             }
 
@@ -750,6 +769,14 @@ struct ContentView: View {
                     }
                     persistSelectedDevices()
                 }
+
+                Button {
+                    cycleToNextOutputDevice()
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                }
+                .buttonStyle(.borderless)
+                .help("Switch to next output device (Control+Option+Command+O)")
             }
 
             // Device profile controls
@@ -1043,6 +1070,15 @@ struct ContentView: View {
             settings.selectedInputDeviceID = selectedInputID.map { Int32($0) }
             settings.selectedOutputDeviceID = selectedOutputID.map { Int32($0) }
         }
+    }
+
+    private func cycleToNextOutputDevice() {
+        let currentDeviceID = selectedOutputID ?? audioEngine.selectedOutputDeviceID
+        guard let nextDevice = deviceManager.nextOutputDevice(after: currentDeviceID) else { return }
+
+        selectedOutputID = nextDevice.id
+        audioEngine.setOutputDevice(nextDevice.id)
+        persistSelectedDevices()
     }
 
     private func importEQFile(_ result: Result<[URL], Error>) {

@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import CoreAudio
+import Carbon.HIToolbox
 
 @main
 struct SoundMaxxApp: App {
@@ -8,13 +9,18 @@ struct SoundMaxxApp: App {
 
     @StateObject private var audioEngine: AudioEngine
     @StateObject private var eqModel: EQModel
+    private let outputSwitchShortcutManager: OutputSwitchShortcutManager
 
     init() {
         let engine = AudioEngine()
         let model = EQModel()
+        let shortcutManager = OutputSwitchShortcutManager {
+            Self.cycleToNextOutputDevice(audioEngine: engine)
+        }
 
         _audioEngine = StateObject(wrappedValue: engine)
         _eqModel = StateObject(wrappedValue: model)
+        outputSwitchShortcutManager = shortcutManager
 
         Self.configureEngineCallbacks(audioEngine: engine, eqModel: model)
         Self.requestMicrophonePermissionAndStart(audioEngine: engine, eqModel: model)
@@ -144,4 +150,121 @@ struct SoundMaxxApp: App {
         audioEngine.setAutoStopClippingEnabled(eqModel.autoStopClippingEnabled)
         audioEngine.setVolume(eqModel.volume)
     }
+
+    private static func cycleToNextOutputDevice(audioEngine: AudioEngine) {
+        let deviceManager = AudioDeviceManager()
+        guard let nextDevice = deviceManager.nextOutputDevice(after: audioEngine.selectedOutputDeviceID) else {
+            return
+        }
+
+        DispatchQueue.main.async {
+            audioEngine.setOutputDevice(nextDevice.id)
+            AppSettingsStore.shared.update { settings in
+                settings.selectedOutputDeviceID = Int32(nextDevice.id)
+            }
+        }
+    }
+}
+
+private final class OutputSwitchShortcutManager {
+    private static let hotKeyCode = UInt32(kVK_ANSI_O)
+    private static let hotKeyModifiers = UInt32(controlKey | optionKey | cmdKey)
+    private static let hotKeyIdentifier = EventHotKeyID(
+        signature: fourCharCode("SMAX"),
+        id: 1
+    )
+
+    private let onShortcutPressed: () -> Void
+    private var hotKeyRef: EventHotKeyRef?
+    private var eventHandlerRef: EventHandlerRef?
+
+    init(onShortcutPressed: @escaping () -> Void) {
+        self.onShortcutPressed = onShortcutPressed
+        registerHotKey()
+    }
+
+    deinit {
+        unregisterHotKey()
+    }
+
+    private func registerHotKey() {
+        var eventSpec = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+
+        let installStatus = InstallEventHandler(
+            GetApplicationEventTarget(),
+            Self.hotKeyHandler,
+            1,
+            &eventSpec,
+            Unmanaged.passUnretained(self).toOpaque(),
+            &eventHandlerRef
+        )
+
+        guard installStatus == noErr else {
+            print("Failed to install output-switch hotkey handler (status: \(installStatus))")
+            return
+        }
+
+        let hotKeyID = Self.hotKeyIdentifier
+        let registerStatus = RegisterEventHotKey(
+            Self.hotKeyCode,
+            Self.hotKeyModifiers,
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotKeyRef
+        )
+
+        if registerStatus != noErr {
+            print("Failed to register output-switch hotkey (status: \(registerStatus))")
+        }
+    }
+
+    private func unregisterHotKey() {
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+            self.hotKeyRef = nil
+        }
+
+        if let eventHandlerRef {
+            RemoveEventHandler(eventHandlerRef)
+            self.eventHandlerRef = nil
+        }
+    }
+
+    private static let hotKeyHandler: EventHandlerUPP = { _, eventRef, userData in
+        guard let eventRef, let userData else {
+            return noErr
+        }
+
+        let manager = Unmanaged<OutputSwitchShortcutManager>.fromOpaque(userData).takeUnretainedValue()
+
+        var hotKeyID = EventHotKeyID()
+        let status = GetEventParameter(
+            eventRef,
+            EventParamName(kEventParamDirectObject),
+            EventParamType(typeEventHotKeyID),
+            nil,
+            MemoryLayout<EventHotKeyID>.size,
+            nil,
+            &hotKeyID
+        )
+
+        guard status == noErr, hotKeyID.signature == hotKeyIdentifier.signature, hotKeyID.id == hotKeyIdentifier.id else {
+            return noErr
+        }
+
+        DispatchQueue.main.async {
+            manager.onShortcutPressed()
+        }
+
+        return noErr
+    }
+}
+
+private func fourCharCode(_ text: String) -> OSType {
+    precondition(text.utf8.count == 4)
+    return text.utf8.reduce(0) { ($0 << 8) + OSType($1) }
 }

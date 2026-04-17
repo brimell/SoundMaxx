@@ -12,10 +12,11 @@ A complete guide to setting up and using SoundMaxx, your system-wide audio equal
 4. [Using the Equalizer](#using-the-equalizer)
 5. [Presets](#presets)
 6. [Per-Device Profiles](#per-device-profiles)
-7. [HDMI Volume Control](#hdmi-volume-control)
-8. [Tips & Best Practices](#tips--best-practices)
-9. [Troubleshooting](#troubleshooting)
-10. [FAQ](#faq)
+7. [Quick Output Shortcut](#quick-output-shortcut)
+8. [HDMI Volume Control](#hdmi-volume-control)
+9. [Tips & Best Practices](#tips--best-practices)
+10. [Troubleshooting](#troubleshooting)
+11. [FAQ](#faq)
 
 ---
 
@@ -219,6 +220,14 @@ Once you've saved a profile, any further EQ adjustments are **automatically save
 | Studio Monitors | Flat or subtle adjustments |
 | HDMI TV | Vocal boost for dialog clarity |
 | Scarlett + Headphones | Flat reference sound |
+
+## Quick Output Shortcut
+
+Use **Control+Option+Command+O** to cycle to the next output device instantly.
+
+- Works while SoundMaxx runs in the menu bar
+- Cycles through the same output list shown in the app
+- Saves the selected output device automatically
 
 ---
 
