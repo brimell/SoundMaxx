@@ -217,8 +217,9 @@ struct AutoEQView: View {
     private func applyAutoEQ(_ headphone: AutoEQHeadphone) {
         autoEQManager.fetchEQ(for: headphone) { result in
             switch result {
-            case .success(let bands):
-                eqModel.parametricBands = EQBand.tenBand(withGains: bands)
+            case .success(let curve):
+                eqModel.parametricBands = EQBand.tenBand(withGains: curve.bands)
+                eqModel.setPreGain(gain: curve.preGain)
                 eqModel.clearPresetSelection()
             case .failure:
                 selectedHeadphone = nil

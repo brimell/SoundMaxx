@@ -180,6 +180,9 @@ class ParametricEQ {
     private var filters: [BiquadFilter] = []
     private var activeBands: [EQBand] = []
     private var pendingBands: [EQBand]?
+    private var preGainDB: Float = 0.0
+    private var preGainLinear: Float = 1.0
+    private var pendingPreGainDB: Float?
     private let updateLock = NSLock()
     private var sampleRate: Float = 48000
     var bypass: Bool = false
@@ -210,14 +213,20 @@ class ParametricEQ {
         setBands(updated)
     }
 
+    func setPreGain(_ gain: Float) {
+        updateLock.lock()
+        pendingPreGainDB = max(-24.0, min(24.0, gain))
+        updateLock.unlock()
+    }
+
     /// Process audio buffer in place
     func process(buffer: UnsafeMutablePointer<Float>, frameCount: Int, channel: Int) {
         guard !bypass else { return }
 
-        applyPendingBandsIfNeeded()
+        applyPendingUpdatesIfNeeded()
 
         for frame in 0..<frameCount {
-            var sample = buffer[frame]
+            var sample = buffer[frame] * preGainLinear
 
             // Apply each enabled filter in series.
             for (filter, band) in zip(filters, activeBands) where band.isEnabled {
@@ -234,11 +243,18 @@ class ParametricEQ {
         }
     }
 
-    private func applyPendingBandsIfNeeded() {
+    private func applyPendingUpdatesIfNeeded() {
         updateLock.lock()
         let nextBands = pendingBands
+        let nextPreGainDB = pendingPreGainDB
         pendingBands = nil
+        pendingPreGainDB = nil
         updateLock.unlock()
+
+        if let nextPreGainDB {
+            preGainDB = nextPreGainDB
+            preGainLinear = powf(10.0, preGainDB / 20.0)
+        }
 
         guard let nextBands else { return }
         applyBandsImmediately(nextBands)

@@ -4,6 +4,7 @@ import Combine
 class EQModel: ObservableObject {
     @Published var parametricBands: [EQBand] = EQBand.defaultTenBand
     @Published var isEnabled: Bool = true
+    @Published var preGain: Float = 0.0
     @Published var volume: Float = 1.0
     @Published var selectedBuiltInPreset: BuiltInPreset? = .flat
     @Published var selectedCustomPreset: CustomPreset? = nil
@@ -24,6 +25,7 @@ class EQModel: ObservableObject {
     private let profileManager = DeviceProfileManager.shared
     private var isLoadingProfile = false
     private let parametricBandsKey = "eq_parametric_bands"
+    private let preGainKey = "eq_pre_gain"
 
     init() {
         loadSettings()
@@ -37,6 +39,14 @@ class EQModel: ObservableObject {
             .store(in: &cancellables)
 
         $isEnabled
+            .sink { [weak self] _ in
+                self?.saveSettings()
+                self?.autoSaveToDeviceProfile()
+            }
+            .store(in: &cancellables)
+
+        $preGain
+            .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
             .sink { [weak self] _ in
                 self?.saveSettings()
                 self?.autoSaveToDeviceProfile()
@@ -75,6 +85,7 @@ class EQModel: ObservableObject {
             deviceName: name,
             eqBands: bandsAsDouble,
             parametricBands: parametricBands,
+            preGain: preGain,
             volume: volume,
             isEQEnabled: isEnabled
         )
@@ -90,6 +101,7 @@ class EQModel: ObservableObject {
     private func loadFromProfile(_ profile: DeviceProfile) {
         isLoadingProfile = true
         parametricBands = profile.effectiveBands
+        preGain = profile.preGain
         volume = profile.volume
         isEnabled = profile.isEQEnabled
         clearPresetSelection()
@@ -109,6 +121,7 @@ class EQModel: ObservableObject {
             deviceName: name,
             eqBands: bandsAsDouble,
             parametricBands: parametricBands,
+            preGain: preGain,
             volume: volume,
             isEQEnabled: isEnabled
         )
@@ -118,12 +131,14 @@ class EQModel: ObservableObject {
         selectedBuiltInPreset = preset
         selectedCustomPreset = nil
         parametricBands = preset.bands
+        preGain = 0.0
     }
 
     func applyCustomPreset(_ preset: CustomPreset) {
         selectedCustomPreset = preset
         selectedBuiltInPreset = nil
         parametricBands = preset.effectiveBands
+        preGain = preset.preGain
     }
 
     func reset() {
@@ -165,12 +180,18 @@ class EQModel: ObservableObject {
         clearPresetSelection()
     }
 
+    func setPreGain(gain: Float) {
+        preGain = min(max(gain, -24.0), 24.0)
+        clearPresetSelection()
+    }
+
     private func saveSettings() {
         UserDefaults.standard.set(legacyGains, forKey: "eq_bands")
         if let encoded = try? JSONEncoder().encode(parametricBands) {
             UserDefaults.standard.set(encoded, forKey: parametricBandsKey)
         }
         UserDefaults.standard.set(isEnabled, forKey: "eq_enabled")
+        UserDefaults.standard.set(preGain, forKey: preGainKey)
         if let preset = selectedBuiltInPreset {
             UserDefaults.standard.set(preset.rawValue, forKey: "eq_builtin_preset")
             UserDefaults.standard.removeObject(forKey: "eq_custom_preset_id")
@@ -189,6 +210,7 @@ class EQModel: ObservableObject {
             parametricBands = EQBand.tenBand(withGains: savedBands.map { $0.floatValue })
         }
         isEnabled = UserDefaults.standard.object(forKey: "eq_enabled") as? Bool ?? true
+        preGain = UserDefaults.standard.object(forKey: preGainKey) as? Float ?? 0.0
 
         if let presetName = UserDefaults.standard.string(forKey: "eq_builtin_preset"),
            let preset = BuiltInPreset(rawValue: presetName) {

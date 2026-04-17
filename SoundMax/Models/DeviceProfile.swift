@@ -9,6 +9,7 @@ struct DeviceProfile: Codable, Identifiable {
     let deviceName: String
     var eqBands: [Double]  // 10 bands, -12 to +12
     var parametricBands: [EQBand]?
+    var preGain: Float     // -24.0 to +24.0
     var volume: Float      // 0.0 to 1.0 (for HDMI/software volume)
     var isEQEnabled: Bool
 
@@ -17,6 +18,7 @@ struct DeviceProfile: Codable, Identifiable {
         deviceName: String,
         eqBands: [Double] = Array(repeating: 0.0, count: 10),
         parametricBands: [EQBand]? = nil,
+        preGain: Float = 0.0,
         volume: Float = 1.0,
         isEQEnabled: Bool = true
     ) {
@@ -24,6 +26,7 @@ struct DeviceProfile: Codable, Identifiable {
         self.deviceName = deviceName
         self.eqBands = eqBands
         self.parametricBands = parametricBands
+        self.preGain = preGain
         self.volume = volume
         self.isEQEnabled = isEQEnabled
     }
@@ -33,6 +36,40 @@ struct DeviceProfile: Codable, Identifiable {
             return parametricBands
         }
         return EQBand.tenBand(withGains: eqBands.map { Float($0) })
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case deviceUID
+        case deviceName
+        case eqBands
+        case parametricBands
+        case preGain
+        case volume
+        case isEQEnabled
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        deviceUID = try container.decode(String.self, forKey: .deviceUID)
+        deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName) ?? "Unknown Device"
+        eqBands = try container.decodeIfPresent([Double].self, forKey: .eqBands) ?? Array(repeating: 0.0, count: 10)
+        parametricBands = try container.decodeIfPresent([EQBand].self, forKey: .parametricBands)
+        preGain = try container.decodeIfPresent(Float.self, forKey: .preGain) ?? 0.0
+        volume = try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0
+        isEQEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEQEnabled) ?? true
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(deviceUID, forKey: .deviceUID)
+        try container.encode(deviceName, forKey: .deviceName)
+        try container.encode(eqBands, forKey: .eqBands)
+        try container.encode(parametricBands, forKey: .parametricBands)
+        try container.encode(preGain, forKey: .preGain)
+        try container.encode(volume, forKey: .volume)
+        try container.encode(isEQEnabled, forKey: .isEQEnabled)
     }
 }
 
@@ -65,6 +102,7 @@ class DeviceProfileManager: ObservableObject {
         deviceName: String,
         eqBands: [Double],
         parametricBands: [EQBand],
+        preGain: Float,
         volume: Float,
         isEQEnabled: Bool
     ) {
@@ -73,6 +111,7 @@ class DeviceProfileManager: ObservableObject {
             deviceName: deviceName,
             eqBands: eqBands,
             parametricBands: parametricBands,
+            preGain: preGain,
             volume: volume,
             isEQEnabled: isEQEnabled
         )

@@ -126,23 +126,52 @@ struct CustomPreset: Codable, Identifiable, Equatable {
     var name: String
     var values: [Float]
     var parametricBands: [EQBand]?
+    var preGain: Float
 
     init(name: String, values: [Float]) {
         self.id = UUID()
         self.name = name
         self.values = values
         self.parametricBands = EQBand.tenBand(withGains: values)
+        self.preGain = 0.0
     }
 
-    init(name: String, bands: [EQBand]) {
+    init(name: String, bands: [EQBand], preGain: Float = 0.0) {
         self.id = UUID()
         self.name = name
         self.values = bands.map { $0.gain }
         self.parametricBands = bands
+        self.preGain = preGain
     }
 
     var effectiveBands: [EQBand] {
         parametricBands ?? EQBand.tenBand(withGains: values)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case values
+        case parametricBands
+        case preGain
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        values = try container.decode([Float].self, forKey: .values)
+        parametricBands = try container.decodeIfPresent([EQBand].self, forKey: .parametricBands)
+        preGain = try container.decodeIfPresent(Float.self, forKey: .preGain) ?? 0.0
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(values, forKey: .values)
+        try container.encode(parametricBands, forKey: .parametricBands)
+        try container.encode(preGain, forKey: .preGain)
     }
 }
 
@@ -156,8 +185,8 @@ class PresetManager: ObservableObject {
         loadPresets()
     }
 
-    func savePreset(name: String, bands: [EQBand]) {
-        let preset = CustomPreset(name: name, bands: bands)
+    func savePreset(name: String, bands: [EQBand], preGain: Float = 0.0) {
+        let preset = CustomPreset(name: name, bands: bands, preGain: preGain)
         customPresets.append(preset)
         persistPresets()
     }
@@ -167,10 +196,11 @@ class PresetManager: ObservableObject {
         persistPresets()
     }
 
-    func updatePreset(_ preset: CustomPreset, bands: [EQBand]) {
+    func updatePreset(_ preset: CustomPreset, bands: [EQBand], preGain: Float = 0.0) {
         if let index = customPresets.firstIndex(where: { $0.id == preset.id }) {
             customPresets[index].values = bands.map { $0.gain }
             customPresets[index].parametricBands = bands
+            customPresets[index].preGain = preGain
             persistPresets()
         }
     }

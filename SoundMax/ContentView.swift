@@ -16,7 +16,7 @@ struct ContentView: View {
     @State private var didInitialStartup = false
     @StateObject private var launchAtLogin = LaunchAtLogin()
 
-    private let menuWidth: CGFloat = 600
+    private let menuWidth: CGFloat = 800
 
     var body: some View {
         VStack(spacing: 16) {
@@ -25,6 +25,8 @@ struct ContentView: View {
             Divider()
 
             eqSliders
+
+            preGainControl
 
             // Volume slider for HDMI/devices without hardware volume
             if audioEngine.outputDeviceNeedsVolumeControl {
@@ -60,6 +62,9 @@ struct ContentView: View {
         .onChange(of: eqModel.isEnabled) { newValue in
             audioEngine.setBypass(!newValue)
         }
+        .onChange(of: eqModel.preGain) { newValue in
+            audioEngine.setPreGain(newValue)
+        }
         .onChange(of: eqModel.volume) { newValue in
             audioEngine.setVolume(newValue)
         }
@@ -73,6 +78,7 @@ struct ContentView: View {
             DispatchQueue.main.async {
                 eqModel.onDeviceChanged(deviceUID: uid, deviceName: name)
                 // Sync volume from profile to engine
+                audioEngine.setPreGain(eqModel.preGain)
                 audioEngine.setVolume(eqModel.volume)
             }
         }
@@ -114,6 +120,7 @@ struct ContentView: View {
 
             Group {
                 helpRow(icon: "slider.vertical.3", title: "EQ Sliders", desc: "Drag up to boost, down to cut (±12dB)")
+                helpRow(icon: "arrow.up.and.down.circle", title: "Pre-Gain", desc: "Adjust overall EQ input level before filters")
                 helpRow(icon: "speaker.wave.2", title: "Volume", desc: "Software volume for HDMI outputs")
                 helpRow(icon: "square.and.arrow.down", title: "Presets", desc: "Select or save EQ configurations")
                 helpRow(icon: "headphones", title: "AutoEQ", desc: "Apply headphone correction curves")
@@ -259,6 +266,37 @@ struct ContentView: View {
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
+    }
+
+    private var preGainControl: some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text("Pre-Gain")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 55, alignment: .leading)
+
+                Slider(
+                    value: Binding(
+                        get: { Double(eqModel.preGain) },
+                        set: { eqModel.setPreGain(gain: Float($0)) }
+                    ),
+                    in: -24...24,
+                    step: 0.5
+                )
+                .help("Adjust pre-gain before EQ filters (range: -24 dB to +24 dB)")
+
+                Text(String(format: "%+.1f dB", eqModel.preGain))
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.secondary)
+                    .frame(width: 62, alignment: .trailing)
+            }
+
+            Text("Applied before EQ filters")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .opacity(eqModel.isEnabled ? 1.0 : 0.5)
     }
 
     private var presetControls: some View {
@@ -518,7 +556,7 @@ struct ContentView: View {
 
                 Button("Save") {
                     if !newPresetName.isEmpty {
-                        presetManager.savePreset(name: newPresetName, bands: eqModel.parametricBands)
+                        presetManager.savePreset(name: newPresetName, bands: eqModel.parametricBands, preGain: eqModel.preGain)
                         showingSavePreset = false
                     }
                 }
@@ -533,6 +571,8 @@ struct ContentView: View {
     private func syncEQToEngine() {
         audioEngine.setBands(eqModel.parametricBands)
         audioEngine.setBypass(!eqModel.isEnabled)
+        audioEngine.setPreGain(eqModel.preGain)
+        audioEngine.setVolume(eqModel.volume)
     }
 
     private func bandFrequencyLabel(_ index: Int) -> String {

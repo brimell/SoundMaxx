@@ -70,7 +70,7 @@ class AutoEQManager: ObservableObject {
 
     // MARK: - Fetch EQ Data
 
-    func fetchEQ(for headphone: AutoEQHeadphone, completion: @escaping (Result<[Float], Error>) -> Void) {
+    func fetchEQ(for headphone: AutoEQHeadphone, completion: @escaping (Result<AutoEQCurve, Error>) -> Void) {
         isLoading = true
         errorMessage = nil
 
@@ -119,8 +119,8 @@ class AutoEQManager: ObservableObject {
                 }
 
                 do {
-                    let bands = try self?.parseGraphicEQ(content) ?? []
-                    completion(.success(bands))
+                    let curve = try self?.parseGraphicEQ(content) ?? AutoEQCurve(bands: [], preGain: 0.0)
+                    completion(.success(curve))
                 } catch {
                     self?.errorMessage = "Could not parse EQ data"
                     completion(.failure(error))
@@ -271,9 +271,10 @@ class AutoEQManager: ObservableObject {
 
     // MARK: - Parse GraphicEQ Format
 
-    private func parseGraphicEQ(_ content: String) throws -> [Float] {
+    private func parseGraphicEQ(_ content: String) throws -> AutoEQCurve {
         // Format: GraphicEQ: 20 -3.5; 22 -3.5; 23 -3.4; ...
         let lines = content.components(separatedBy: .newlines)
+        let preGain = parsePreamp(lines)
         guard let eqLine = lines.first(where: { $0.trimmingCharacters(in: .whitespaces).hasPrefix("GraphicEQ:") }) else {
             throw AutoEQError.parseError
         }
@@ -304,7 +305,29 @@ class AutoEQManager: ObservableObject {
 
         frequencyGainMap.sort { $0.0 < $1.0 }
 
-        return interpolateToTargetBands(frequencyGainMap)
+        return AutoEQCurve(
+            bands: interpolateToTargetBands(frequencyGainMap),
+            preGain: preGain
+        )
+    }
+
+    private func parsePreamp(_ lines: [String]) -> Float {
+        guard let preampLine = lines.first(where: { $0.lowercased().trimmingCharacters(in: .whitespaces).hasPrefix("preamp:") }) else {
+            return 0.0
+        }
+
+        guard let separator = preampLine.firstIndex(of: ":") else { return 0.0 }
+
+        let rawValue = preampLine[preampLine.index(after: separator)...]
+            .replacingOccurrences(of: "dB", with: "", options: .caseInsensitive)
+            .trimmingCharacters(in: .whitespaces)
+
+        guard let token = rawValue.split(whereSeparator: { $0.isWhitespace }).first,
+              let preampValue = Float(token) else {
+            return 0.0
+        }
+
+        return max(-24.0, min(24.0, preampValue))
     }
 
     // MARK: - Interpolation
@@ -396,6 +419,11 @@ struct AutoEQHeadphone: Identifiable, Hashable {
 
         return "\(source) / \(sourceVariant)"
     }
+}
+
+struct AutoEQCurve {
+    let bands: [Float]
+    let preGain: Float
 }
 
 private struct GitTreeResponse: Decodable {
