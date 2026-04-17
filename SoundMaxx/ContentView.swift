@@ -318,7 +318,7 @@ struct ContentView: View {
             isRunning: audioEngine.isRunning,
             sampleRate: audioEngine.processingSampleRate
         )
-        .frame(height: isCompactLayout ? 94 : 118)
+        .frame(height: isCompactLayout ? 108 : 132)
         .help("Real-time output spectrum after EQ, volume, and limiter.")
     }
 
@@ -1409,6 +1409,9 @@ private struct SpectrumAnalyzerView: View {
     private let minFrequency: Float = 20.0
     private let frequencyTicks: [Float] = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
     private let labeledFrequencyTicks: [Float] = [31.5, 125, 500, 2000, 8000, 16000]
+    private let amplitudeTicks: [Float] = [0.2, 0.4, 0.6, 0.8]
+    private let chartTopInset: CGFloat = 4
+    private let chartBottomInset: CGFloat = 14
 
     private var maxFrequency: Float {
         max(200.0, min(Float(sampleRate * 0.5), 20_000.0))
@@ -1436,6 +1439,15 @@ private struct SpectrumAnalyzerView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color.gray.opacity(0.08))
 
+                    ForEach(amplitudeTicks, id: \.self) { tick in
+                        Path { path in
+                            let y = yPosition(for: tick, in: height)
+                            path.move(to: CGPoint(x: 0, y: y))
+                            path.addLine(to: CGPoint(x: width, y: y))
+                        }
+                        .stroke(Color.secondary.opacity(0.1), lineWidth: 0.8)
+                    }
+
                     ForEach(frequencyTicks.filter { $0 <= maxFrequency }, id: \.self) { tick in
                         Path { path in
                             let x = xPosition(for: tick, in: width)
@@ -1445,30 +1457,33 @@ private struct SpectrumAnalyzerView: View {
                         .stroke(Color.secondary.opacity(0.12), lineWidth: 0.8)
                     }
 
-                    HStack(alignment: .bottom, spacing: 2) {
-                        ForEach(Array(bars.enumerated()), id: \.offset) { _, value in
-                            let normalized = max(0.0, min(1.0, value))
-                            let barHeight = max(1.0, CGFloat(normalized) * (height - 16.0))
-
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.cyan.opacity(0.85),
-                                            Color.orange.opacity(0.9)
-                                        ],
-                                        startPoint: .bottom,
-                                        endPoint: .top
-                                    )
+                    if bars.count > 1 {
+                        spectrumFillPath(in: CGSize(width: width, height: height))
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.cyan.opacity(0.26),
+                                        Color.orange.opacity(0.18),
+                                        Color.clear
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
                                 )
-                                .opacity(0.3 + (Double(normalized) * 0.7))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: barHeight)
-                        }
+                            )
+
+                        spectrumPath(in: CGSize(width: width, height: height))
+                            .stroke(Color.cyan.opacity(0.24), lineWidth: 3.8)
+
+                        spectrumPath(in: CGSize(width: width, height: height))
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.cyan, Color.orange],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round)
+                            )
                     }
-                    .padding(.horizontal, 4)
-                    .padding(.bottom, 12)
-                    .padding(.top, 4)
 
                     if !isRunning {
                         Text("Start audio to view spectrum")
@@ -1488,6 +1503,56 @@ private struct SpectrumAnalyzerView: View {
                 }
             }
         }
+    }
+
+    private func spectrumPath(in size: CGSize) -> Path {
+        var path = Path()
+        guard bars.count > 1 else { return path }
+
+        let firstX = xPositionForBar(at: 0, totalBars: bars.count, in: size.width)
+        let firstY = yPosition(for: bars[0], in: size.height)
+        path.move(to: CGPoint(x: firstX, y: firstY))
+
+        for index in 1..<bars.count {
+            let x = xPositionForBar(at: index, totalBars: bars.count, in: size.width)
+            let y = yPosition(for: bars[index], in: size.height)
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+
+        return path
+    }
+
+    private func spectrumFillPath(in size: CGSize) -> Path {
+        var path = Path()
+        guard bars.count > 1 else { return path }
+
+        let baseline = yPosition(for: 0.0, in: size.height)
+        let startX = xPositionForBar(at: 0, totalBars: bars.count, in: size.width)
+        path.move(to: CGPoint(x: startX, y: baseline))
+
+        for index in 0..<bars.count {
+            let x = xPositionForBar(at: index, totalBars: bars.count, in: size.width)
+            let y = yPosition(for: bars[index], in: size.height)
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+
+        let endX = xPositionForBar(at: bars.count - 1, totalBars: bars.count, in: size.width)
+        path.addLine(to: CGPoint(x: endX, y: baseline))
+        path.closeSubpath()
+        return path
+    }
+
+    private func xPositionForBar(at index: Int, totalBars: Int, in width: CGFloat) -> CGFloat {
+        guard totalBars > 1 else { return 0 }
+        let normalized = Float(index) / Float(totalBars - 1)
+        let frequency = minFrequency * powf(maxFrequency / minFrequency, normalized)
+        return xPosition(for: frequency, in: width)
+    }
+
+    private func yPosition(for normalizedValue: Float, in height: CGFloat) -> CGFloat {
+        let clamped = max(0.0, min(1.0, normalizedValue))
+        let chartHeight = max(1.0, height - chartTopInset - chartBottomInset)
+        return chartTopInset + ((1.0 - CGFloat(clamped)) * chartHeight)
     }
 
     private func xPosition(for frequency: Float, in width: CGFloat) -> CGFloat {

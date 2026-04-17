@@ -912,7 +912,7 @@ class RingBuffer {
 }
 
 final class SpectrumAnalyzer {
-    static let defaultBarCount = 64
+    static let defaultBarCount = 192
 
     private let sampleRate: Float
     private let fftSize: Int
@@ -938,7 +938,7 @@ final class SpectrumAnalyzer {
 
     private(set) var currentBars: [Float]
 
-    init(sampleRate: Float, fftSize: Int = 2048, hopSize: Int = 1024, barCount: Int = SpectrumAnalyzer.defaultBarCount) {
+    init(sampleRate: Float, fftSize: Int = 4096, hopSize: Int = 1024, barCount: Int = SpectrumAnalyzer.defaultBarCount) {
         precondition(fftSize > 0 && (fftSize & (fftSize - 1)) == 0, "FFT size must be a power of two")
         precondition(hopSize > 0 && hopSize <= fftSize, "Hop size must be between 1 and fftSize")
         precondition(barCount > 0, "Bar count must be greater than zero")
