@@ -12,6 +12,7 @@ struct AppSettings: Codable {
     var limiterCeilingDB: Float = -1.0
     var autoStopClippingEnabled: Bool = false
     var volume: Float = 1.0
+    var usePerDeviceVolume: Bool = true
     var autoSaveEnabled: Bool = true
     var selectedBuiltInPresetName: String? = nil
     var selectedCustomPresetID: String? = nil
@@ -30,6 +31,7 @@ struct AppSettings: Codable {
         case limiterCeilingDB
         case autoStopClippingEnabled
         case volume
+        case usePerDeviceVolume
         case autoSaveEnabled
         case selectedBuiltInPresetName
         case selectedCustomPresetID
@@ -53,6 +55,7 @@ struct AppSettings: Codable {
         limiterCeilingDB = try container.decodeIfPresent(Float.self, forKey: .limiterCeilingDB) ?? -1.0
         autoStopClippingEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoStopClippingEnabled) ?? false
         volume = try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0
+        usePerDeviceVolume = try container.decodeIfPresent(Bool.self, forKey: .usePerDeviceVolume) ?? true
         autoSaveEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoSaveEnabled) ?? true
         selectedBuiltInPresetName = try container.decodeIfPresent(String.self, forKey: .selectedBuiltInPresetName)
         selectedCustomPresetID = try container.decodeIfPresent(String.self, forKey: .selectedCustomPresetID)
@@ -74,6 +77,7 @@ struct AppSettings: Codable {
         try container.encode(limiterCeilingDB, forKey: .limiterCeilingDB)
         try container.encode(autoStopClippingEnabled, forKey: .autoStopClippingEnabled)
         try container.encode(volume, forKey: .volume)
+        try container.encode(usePerDeviceVolume, forKey: .usePerDeviceVolume)
         try container.encode(autoSaveEnabled, forKey: .autoSaveEnabled)
         try container.encode(selectedBuiltInPresetName, forKey: .selectedBuiltInPresetName)
         try container.encode(selectedCustomPresetID, forKey: .selectedCustomPresetID)
