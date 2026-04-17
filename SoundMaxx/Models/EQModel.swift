@@ -35,6 +35,8 @@ class EQModel: ObservableObject {
     @Published var autoSaveEnabled: Bool = true
     @Published private(set) var canUndo: Bool = false
     @Published private(set) var canRedo: Bool = false
+    @Published private(set) var hasCompareA: Bool = false
+    @Published private(set) var hasCompareB: Bool = false
 
     static let frequencyLabels = ["32", "64", "125", "250", "500", "1K", "2K", "4K", "8K", "16K"]
     static let minimumBandCount = 1
@@ -58,6 +60,8 @@ class EQModel: ObservableObject {
     private let legacyAutoStopClippingKey = "eq_auto_stop_clipping"
     private var undoHistory: [HistorySnapshot] = []
     private var redoHistory: [HistorySnapshot] = []
+    private var compareSnapshotA: HistorySnapshot?
+    private var compareSnapshotB: HistorySnapshot?
     private var isApplyingHistorySnapshot = false
     private var lastHistoryContext: String?
     private var lastHistoryContextTime: TimeInterval = 0
@@ -160,6 +164,7 @@ class EQModel: ObservableObject {
         }
 
         clearHistory()
+        clearCompareSnapshots()
     }
 
     func saveCurrentAsDeviceProfile() {
@@ -468,9 +473,28 @@ class EQModel: ObservableObject {
         clearPresetSelection()
     }
 
+    func saveCompareSnapshotA() {
+        compareSnapshotA = makeHistorySnapshot()
+        hasCompareA = compareSnapshotA != nil
+    }
+
+    func saveCompareSnapshotB() {
+        compareSnapshotB = makeHistorySnapshot()
+        hasCompareB = compareSnapshotB != nil
+    }
+
+    func loadCompareSnapshotA() {
+        loadCompareSnapshot(compareSnapshotA, context: "compare-a-load")
+    }
+
+    func loadCompareSnapshotB() {
+        loadCompareSnapshot(compareSnapshotB, context: "compare-b-load")
+    }
+
     func reloadFromStoredSettings() {
         loadSettings()
         clearHistory()
+        clearCompareSnapshots()
     }
 
     func undo() {
@@ -554,6 +578,20 @@ class EQModel: ObservableObject {
         redoHistory.removeAll()
         lastHistoryContext = nil
         lastHistoryContextTime = 0
+        updateHistoryAvailability()
+    }
+
+    private func clearCompareSnapshots() {
+        compareSnapshotA = nil
+        compareSnapshotB = nil
+        hasCompareA = false
+        hasCompareB = false
+    }
+
+    private func loadCompareSnapshot(_ snapshot: HistorySnapshot?, context: String) {
+        guard let snapshot else { return }
+        recordHistorySnapshot(context: context)
+        applyHistorySnapshot(snapshot)
         updateHistoryAvailability()
     }
 

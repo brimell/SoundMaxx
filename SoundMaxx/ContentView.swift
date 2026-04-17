@@ -1125,6 +1125,28 @@ struct ContentView: View {
                 .keyboardShortcut("z", modifiers: [.command, .shift])
                 .help("Redo last undone EQ change")
 
+                Button("Save A") {
+                    eqModel.saveCompareSnapshotA()
+                }
+                .help("Save current EQ state as compare slot A")
+
+                Button("A") {
+                    eqModel.loadCompareSnapshotA()
+                }
+                .disabled(!eqModel.hasCompareA)
+                .help("Load compare slot A")
+
+                Button("Save B") {
+                    eqModel.saveCompareSnapshotB()
+                }
+                .help("Save current EQ state as compare slot B")
+
+                Button("B") {
+                    eqModel.loadCompareSnapshotB()
+                }
+                .disabled(!eqModel.hasCompareB)
+                .help("Load compare slot B")
+
                 Button(audioEngine.isRunning ? "Stop" : "Start") {
                     if audioEngine.isRunning {
                         audioEngine.stop()
@@ -1163,6 +1185,24 @@ struct ContentView: View {
                     eqModel.redo()
                 }
                 .disabled(!eqModel.canRedo)
+
+                Button("Save A") {
+                    eqModel.saveCompareSnapshotA()
+                }
+
+                Button("A") {
+                    eqModel.loadCompareSnapshotA()
+                }
+                .disabled(!eqModel.hasCompareA)
+
+                Button("Save B") {
+                    eqModel.saveCompareSnapshotB()
+                }
+
+                Button("B") {
+                    eqModel.loadCompareSnapshotB()
+                }
+                .disabled(!eqModel.hasCompareB)
 
                 Button(audioEngine.isRunning ? "Stop" : "Start") {
                     if audioEngine.isRunning {
