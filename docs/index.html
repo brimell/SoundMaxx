@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SoundMax - Free SoundSource Alternative for macOS | 10-Band System EQ</title>
-    <meta name="description" content="SoundMax is a free, open-source 10-band parametric equalizer for macOS. A lightweight SoundSource alternative with per-device profiles, HDMI volume control, and AutoEQ headphone correction.">
-    <meta name="keywords" content="SoundSource alternative, macOS equalizer, free EQ mac, system audio equalizer, 10-band EQ, HDMI volume control, AutoEQ, macOS Sonoma, eqMac alternative">
+    <title>SoundMax - Free SoundSource Alternative for macOS | 10-Band Parametric EQ</title>
+    <meta name="description" content="SoundMax is a free, open-source 10-band parametric equalizer for macOS with per-band frequency/Q controls, 7 filter types, smart device profiles, HDMI volume control, and AutoEQ integration.">
+    <meta name="keywords" content="SoundSource alternative, macOS equalizer, free EQ mac, parametric EQ macOS, 10-band EQ, filter types, HDMI volume control, AutoEQ, macOS Sonoma, eqMac alternative">
     <meta name="author" content="snap-sites">
 
     <!-- Open Graph / Social -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="SoundMax - Free SoundSource Alternative for macOS">
-    <meta property="og:description" content="Free, open-source 10-band system EQ with per-device profiles, HDMI volume control, and AutoEQ integration.">
+    <meta property="og:description" content="Free, open-source 10-band parametric EQ with frequency/Q controls, 7 filter types, device profile auto-save, HDMI volume control, and AutoEQ integration.">
     <meta property="og:url" content="https://snap-sites.github.io/SoundMax/">
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="SoundMax - Free SoundSource Alternative">
-    <meta name="twitter:description" content="Free 10-band system EQ for macOS with AutoEQ headphone correction.">
+    <meta name="twitter:description" content="Free 10-band parametric EQ for macOS with filter types, smart device profiles, and AutoEQ headphone correction.">
 
     <style>
         :root {
@@ -98,7 +98,7 @@
     <div class="container">
         <header>
             <h1>Sound<span>Max</span></h1>
-            <p class="tagline">Free, open-source 10-band system EQ for macOS</p>
+            <p class="tagline">Free, open-source 10-band parametric EQ for macOS</p>
             <p class="tagline" style="font-size: 1rem;">The lightweight <strong>SoundSource alternative</strong> you've been looking for</p>
 
             <div class="badges">
@@ -117,8 +117,8 @@
             <h2 style="text-align: center; margin-bottom: 1.5rem;">See It In Action</h2>
             <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: center;">
                 <div style="text-align: center;">
-                    <img src="screenshot-main.png" alt="SoundMax 10-band EQ interface" style="max-width: 320px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
-                    <p style="color: var(--muted); margin-top: 0.5rem; font-size: 0.9rem;">10-Band EQ with HDMI Volume</p>
+                    <img src="screenshot-main.png" alt="SoundMax parametric EQ interface" style="max-width: 320px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
+                    <p style="color: var(--muted); margin-top: 0.5rem; font-size: 0.9rem;">Parametric EQ with Advanced Controls</p>
                 </div>
                 <div style="text-align: center;">
                     <img src="screenshot-help.png" alt="SoundMax quick help popover" style="max-width: 320px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
@@ -134,11 +134,15 @@
         <section class="features">
             <div class="feature">
                 <h3>10-Band Parametric EQ</h3>
-                <p>Professional biquad filtering from 32Hz to 16kHz with ±12dB per band.</p>
+                <p>Per-band frequency, gain, and Q control from 32Hz to 16kHz with real-time DSP processing.</p>
             </div>
             <div class="feature">
-                <h3>Per-Device Profiles</h3>
-                <p>Automatically saves and restores your EQ settings for each output device.</p>
+                <h3>7 Filter Types Per Band</h3>
+                <p>Peak, Low Shelf, High Shelf, Low Pass, High Pass, Notch, and Band Pass filters built right into the UI.</p>
+            </div>
+            <div class="feature">
+                <h3>Smart Device Profiles</h3>
+                <p>Save once, then auto-restore and auto-save EQ plus software volume for each output device.</p>
             </div>
             <div class="feature">
                 <h3>HDMI Volume Control</h3>
@@ -146,15 +150,11 @@
             </div>
             <div class="feature">
                 <h3>AutoEQ Integration</h3>
-                <p>One-click headphone correction for 150+ popular models including AirPods, Sony, Sennheiser, Beyerdynamic, and more.</p>
+                <p>Search and apply headphone correction curves for 150+ popular models, including AirPods, Sony, Sennheiser, and more.</p>
             </div>
             <div class="feature">
-                <h3>Menu Bar App</h3>
-                <p>Lives in your menu bar. No dock icon. Always accessible.</p>
-            </div>
-            <div class="feature">
-                <h3>100% Free & Open Source</h3>
-                <p>MIT licensed. No subscriptions, no Pro tier, no tracking.</p>
+                <h3>Menu Bar + Launch at Login</h3>
+                <p>Always available from the menu bar, with optional launch-at-login for a seamless daily workflow.</p>
             </div>
         </section>
 
@@ -177,7 +177,7 @@
                         <td>Free / $34 Pro</td>
                     </tr>
                     <tr>
-                        <td>10-Band EQ</td>
+                        <td>10-Band Parametric EQ</td>
                         <td class="check">✓</td>
                         <td class="check">✓</td>
                         <td class="check">✓</td>
@@ -185,6 +185,12 @@
                     <tr>
                         <td>Per-Device Profiles</td>
                         <td class="check">✓ Auto</td>
+                        <td>Limited</td>
+                        <td>Limited</td>
+                    </tr>
+                    <tr>
+                        <td>Profile Auto-Save</td>
+                        <td class="check">✓</td>
                         <td>Limited</td>
                         <td>Limited</td>
                     </tr>
