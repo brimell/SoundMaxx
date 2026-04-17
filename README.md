@@ -83,7 +83,7 @@ xcode-select --install
 brew install xcodegen
 
 # Clone and build
-git clone https://github.com/brimell/SoundMax.git
+git clone https://github.com/brimell/SoundMaxx.git
 cd SoundMax
 xcodegen generate
 xcodebuild -project SoundMaxx.xcodeproj -scheme SoundMaxx -configuration Release build
