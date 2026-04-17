@@ -52,9 +52,12 @@ DMG_PATH="$BUILD_DIR/$DMG_NAME.dmg"
 # Use create-dmg for a nicer looking installer
 if command -v create-dmg >/dev/null 2>&1; then
     echo "Creating customized DMG with create-dmg..."
+    # Use a temp directory for DMG creation to avoid cluttering build dir
+    TEMP_DMG_DIR=$(mktemp -d)
+    cp -R "$DMG_DIR/" "$TEMP_DMG_DIR/"
+    
     create-dmg \
         --volname "$APP_NAME" \
-        --volicon "$APP_PATH/Contents/Resources/AppIcon.icns" \
         --window-pos 200 120 \
         --window-size 660 400 \
         --icon-size 128 \
@@ -63,7 +66,10 @@ if command -v create-dmg >/dev/null 2>&1; then
         --app-drop-link 480 170 \
         --no-internet-enable \
         "$DMG_PATH" \
-        "$DMG_DIR"
+        "$TEMP_DMG_DIR"
+    
+    # Clean up temp directory
+    rm -rf "$TEMP_DMG_DIR"
 else
     echo "create-dmg not found, using basic hdiutil..."
     hdiutil create -volname "$APP_NAME" \
