@@ -6,6 +6,12 @@ SoundMaxx sits in your menu bar and applies real-time EQ processing to all syste
 
 Project website: [https://brimell.github.io/SoundMaxx/](https://brimell.github.io/SoundMaxx/)
 
+## Screenshots
+
+![SoundMaxx screenshot 1](docs/Screenshot%202026-04-17%20at%2020.26.21.png)
+
+![SoundMaxx screenshot 2](docs/Screenshot%202026-04-17%20at%2020.26.42.png)
+
 ## Features
 
 - **10-Band Parametric EQ (Expandable)** - Starts at 10 bands (32Hz to 16kHz) and supports adding/removing bands in Advanced Options
