@@ -48,10 +48,29 @@ ln -s /Applications "$DMG_DIR/Applications"
 
 # Create the DMG
 DMG_PATH="$BUILD_DIR/$DMG_NAME.dmg"
-hdiutil create -volname "$APP_NAME" \
-    -srcfolder "$DMG_DIR" \
-    -ov -format UDZO \
-    "$DMG_PATH"
+
+# Use create-dmg for a nicer looking installer
+if command -v create-dmg >/dev/null 2>&1; then
+    echo "Creating customized DMG with create-dmg..."
+    create-dmg \
+        --volname "$APP_NAME" \
+        --volicon "$APP_PATH/Contents/Resources/AppIcon.icns" \
+        --window-pos 200 120 \
+        --window-size 660 400 \
+        --icon-size 128 \
+        --icon "$APP_NAME.app" 180 170 \
+        --hide-extension "$APP_NAME.app" \
+        --app-drop-link 480 170 \
+        --no-internet-enable \
+        "$DMG_PATH" \
+        "$DMG_DIR"
+else
+    echo "create-dmg not found, using basic hdiutil..."
+    hdiutil create -volname "$APP_NAME" \
+        -srcfolder "$DMG_DIR" \
+        -ov -format UDZO \
+        "$DMG_PATH"
+fi
 
 echo ""
 echo "=== Build Complete ==="
