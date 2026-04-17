@@ -6,27 +6,27 @@ struct EQSliderView: View {
     var tooltip: String = ""
 
     private let range: ClosedRange<Float> = -12...12
-    private let sliderHeight: CGFloat = 120
+    private let sliderHeight: CGFloat = 150
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
             // Value display
             Text(formattedValue)
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundColor(valueColor)
-                .frame(width: 32)
+                .frame(width: 38)
 
             // Slider track
             ZStack {
                 // Background track
                 RoundedRectangle(cornerRadius: 3)
                     .fill(Color.gray.opacity(0.3))
-                    .frame(width: 8, height: sliderHeight)
+                    .frame(width: 10, height: sliderHeight)
 
                 // Center line (0 dB mark)
                 Rectangle()
                     .fill(Color.gray.opacity(0.6))
-                    .frame(width: 16, height: 2)
+                    .frame(width: 20, height: 2)
 
                 // Fill from center
                 VStack(spacing: 0) {
@@ -35,7 +35,7 @@ struct EQSliderView: View {
                         Spacer()
                         RoundedRectangle(cornerRadius: 2)
                             .fill(Color.orange)
-                            .frame(width: 6, height: fillHeight)
+                            .frame(width: 8, height: fillHeight)
                         Spacer()
                             .frame(height: sliderHeight / 2)
                     } else {
@@ -44,7 +44,7 @@ struct EQSliderView: View {
                             .frame(height: sliderHeight / 2)
                         RoundedRectangle(cornerRadius: 2)
                             .fill(Color.blue)
-                            .frame(width: 6, height: fillHeight)
+                            .frame(width: 8, height: fillHeight)
                         Spacer()
                     }
                 }
@@ -54,10 +54,10 @@ struct EQSliderView: View {
                 Circle()
                     .fill(Color.white)
                     .shadow(radius: 2)
-                    .frame(width: 16, height: 16)
+                    .frame(width: 20, height: 20)
                     .offset(y: thumbOffset)
             }
-            .frame(width: 24, height: sliderHeight)
+            .frame(width: 30, height: sliderHeight)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -66,9 +66,10 @@ struct EQSliderView: View {
                     }
             )
 
+            // Frequency label
             if !label.isEmpty {
                 Text(label)
-                    .font(.system(size: 9))
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }
         }

@@ -16,10 +16,10 @@ struct ContentView: View {
     @State private var didInitialStartup = false
     @StateObject private var launchAtLogin = LaunchAtLogin()
 
-    private let menuWidth: CGFloat = 520
+    private let menuWidth: CGFloat = 600
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             header
 
             Divider()
@@ -43,8 +43,9 @@ struct ContentView: View {
 
             footer
         }
-        .padding(16)
+        .padding(18)
         .frame(width: menuWidth)
+        .font(.system(size: 14))
         .onAppear {
             setupDeviceChangeCallback()
             syncEQToEngine()
@@ -80,10 +81,10 @@ struct ContentView: View {
     private var header: some View {
         HStack {
             Image(systemName: "slider.horizontal.3")
-                .font(.title2)
+                .font(.title)
 
             Text("SoundMaxx EQ")
-                .font(.headline)
+                .font(.title3.weight(.semibold))
 
             Spacer()
 
