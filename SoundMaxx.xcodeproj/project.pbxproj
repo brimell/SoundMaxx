@@ -9,13 +9,13 @@
 /* Begin PBXBuildFile section */
 		15F132AC9067AD02135BE53C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4C0AF6B0B38D96090AD4C380 /* Assets.xcassets */; };
 		1E48CE5399622798326732E4 /* AudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6A097FC8AA074A9C2DB3A90 /* AudioEngine.swift */; };
-		A1B2C3D4E5F60718293A4B5C /* AppSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* AppSettingsStore.swift */; };
 		24E3AA5A5372279C027A868B /* AutoEQManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B05A2248530D9686BF6F7124 /* AutoEQManager.swift */; };
 		2A2494488E18410C6D27F795 /* EQModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8A60E655B672C965CAE226 /* EQModel.swift */; };
 		2F8C0C1985B0255E7CB26D51 /* EQSliderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78ED980AAED8A73537EC45E /* EQSliderView.swift */; };
 		412E933C0BCF56E5DCA7AA27 /* AutoEQView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA9C36C360A279CD47D5823 /* AutoEQView.swift */; };
 		4469824EEEA88F4E660DF7AB /* AudioDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C444BFFBC1DBCB0D06DD4304 /* AudioDeviceManager.swift */; };
 		8D8D801DB1C99A988241BF5B /* BiquadFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51FD6D0200D7D0FE3101D83A /* BiquadFilter.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* AppSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* AppSettingsStore.swift */; };
 		B44A1A949BC2A06490A7617D /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07907DEB12E0717D58D55A19 /* LaunchAtLogin.swift */; };
 		B4E9A50D6F86F805FBF71FC5 /* EQPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03EC78AF207C511ECF968539 /* EQPreset.swift */; };
 		D4EE2DFEEB5854168EF0A0D9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F71D1309559DC169C09D7F42 /* ContentView.swift */; };
@@ -27,11 +27,11 @@
 		03EC78AF207C511ECF968539 /* EQPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EQPreset.swift; sourceTree = "<group>"; };
 		07907DEB12E0717D58D55A19 /* LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLogin.swift; sourceTree = "<group>"; };
 		0DDABD38567914BE03CA937E /* DeviceProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceProfile.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60718293A4B5D /* AppSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsStore.swift; sourceTree = "<group>"; };
 		4C0AF6B0B38D96090AD4C380 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5008C2369D4FCA33AE27B502 /* SoundMaxx.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SoundMaxx.entitlements; sourceTree = "<group>"; };
 		51FD6D0200D7D0FE3101D83A /* BiquadFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiquadFilter.swift; sourceTree = "<group>"; };
 		5E8A60E655B672C965CAE226 /* EQModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EQModel.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5D /* AppSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsStore.swift; sourceTree = "<group>"; };
 		B05A2248530D9686BF6F7124 /* AutoEQManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoEQManager.swift; sourceTree = "<group>"; };
 		B42DA36A1F8703E28C5084AF /* SoundMaxxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundMaxxApp.swift; sourceTree = "<group>"; };
 		C444BFFBC1DBCB0D06DD4304 /* AudioDeviceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDeviceManager.swift; sourceTree = "<group>"; };
@@ -195,18 +195,23 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SoundMaxx/SoundMaxx.entitlements;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = QQ62NJFH8G;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = SoundMaxx/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.SoundMaxx;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brimell.SoundMaxx;
 				PRODUCT_NAME = SoundMaxx;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 			};
@@ -217,18 +222,23 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SoundMaxx/SoundMaxx.entitlements;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = QQ62NJFH8G;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = SoundMaxx/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.SoundMaxx;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brimell.SoundMaxx;
 				PRODUCT_NAME = SoundMaxx;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 			};
