@@ -1,3 +1,4 @@
+import Foundation
 import AVFoundation
 import CoreAudio
 import AudioToolbox
@@ -19,10 +20,17 @@ class AudioEngine: ObservableObject {
     @Published var selectedInputDeviceID: AudioDeviceID?
     @Published var selectedOutputDeviceID: AudioDeviceID?
     @Published var errorMessage: String?
+    @Published private(set) var processingSampleRate: Double = 48000
 
     // Software volume control (0.0 to 1.0)
     @Published var softwareVolume: Float = 1.0
     @Published var preGain: Float = 0.0
+    @Published var autoStopClippingEnabled: Bool = false
+
+    private var autoStopClippingRuntimeEnabled = false
+    private var lastAutoPreGainAdjustmentTime: TimeInterval = 0
+    private let autoPreGainAdjustmentInterval: TimeInterval = 0.25
+    private let autoPreGainHeadroomDB: Float = 0.2
 
     // Device info
     @Published var outputDeviceNeedsVolumeControl = false
@@ -31,6 +39,7 @@ class AudioEngine: ObservableObject {
 
     // Callback for device changes
     var onOutputDeviceChanged: ((AudioDeviceID, String, String) -> Void)?
+    var onPreGainAutoAdjusted: ((Float) -> Void)?
 
     static let bandFrequencies: [Float] = EQBand.defaultFrequencies
 
@@ -43,6 +52,11 @@ class AudioEngine: ObservableObject {
     func setPreGain(_ gain: Float) {
         preGain = max(-24.0, min(24.0, gain))
         parametricEQ?.setPreGain(preGain)
+    }
+
+    func setAutoStopClippingEnabled(_ enabled: Bool) {
+        autoStopClippingEnabled = enabled
+        autoStopClippingRuntimeEnabled = enabled
     }
 
     func setGain(forBand band: Int, gain: Float) {
@@ -169,6 +183,8 @@ class AudioEngine: ObservableObject {
                 mBitsPerChannel: 32,
                 mReserved: 0
             )
+
+            processingSampleRate = workingSampleRate
 
             // Initialize ring buffer
             ringBuffer = RingBuffer(channels: 2, bytesPerFrame: 8, capacityFrames: bufferSize * 4)
@@ -537,19 +553,57 @@ class AudioEngine: ObservableObject {
             }
         }
 
-        // Apply software volume
+        // Apply software volume and optionally detect clipping.
+        let autoStopEnabled = autoStopClippingRuntimeEnabled
         let volume = softwareVolume
-        if volume < 1.0 {
+        if volume < 1.0 || autoStopEnabled {
+            var peakSample: Float = 0.0
             let bufferListPtr = UnsafeMutableAudioBufferListPointer(ioData)
             for buffer in bufferListPtr {
                 guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
                 for i in 0..<Int(inNumberFrames) {
-                    data[i] *= volume
+                    if volume < 1.0 {
+                        data[i] *= volume
+                    }
+
+                    if autoStopEnabled {
+                        let absSample = fabsf(data[i])
+                        if absSample > peakSample {
+                            peakSample = absSample
+                        }
+                    }
                 }
+            }
+
+            if autoStopEnabled {
+                reducePreGainIfClipping(peakSample)
             }
         }
 
         return noErr
+    }
+
+    private func reducePreGainIfClipping(_ peakSample: Float) {
+        guard peakSample > 1.0 else { return }
+
+        let now = Date().timeIntervalSinceReferenceDate
+        guard now - lastAutoPreGainAdjustmentTime >= autoPreGainAdjustmentInterval else { return }
+
+        let requiredReductionDB = (20.0 * log10f(peakSample)) + autoPreGainHeadroomDB
+        guard requiredReductionDB > 0 else { return }
+
+        let currentPreGain = preGain
+        let newPreGain = max(-24.0, currentPreGain - requiredReductionDB)
+        guard newPreGain < currentPreGain - 0.05 else { return }
+
+        lastAutoPreGainAdjustmentTime = now
+        parametricEQ?.setPreGain(newPreGain)
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.preGain = newPreGain
+            self.onPreGainAutoAdjusted?(newPreGain)
+        }
     }
 }
 

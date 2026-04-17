@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var newPresetName = ""
     @State private var didInitialStartup = false
     @StateObject private var launchAtLogin = LaunchAtLogin()
+    private let settingsStore = AppSettingsStore.shared
 
     private let menuWidth: CGFloat = 800
 
@@ -23,6 +24,8 @@ struct ContentView: View {
             header
 
             Divider()
+
+            responseGraph
 
             eqSliders
 
@@ -65,6 +68,9 @@ struct ContentView: View {
         .onChange(of: eqModel.preGain) { newValue in
             audioEngine.setPreGain(newValue)
         }
+        .onChange(of: eqModel.autoStopClippingEnabled) { newValue in
+            audioEngine.setAutoStopClippingEnabled(newValue)
+        }
         .onChange(of: eqModel.volume) { newValue in
             audioEngine.setVolume(newValue)
         }
@@ -79,7 +85,14 @@ struct ContentView: View {
                 eqModel.onDeviceChanged(deviceUID: uid, deviceName: name)
                 // Sync volume from profile to engine
                 audioEngine.setPreGain(eqModel.preGain)
+                audioEngine.setAutoStopClippingEnabled(eqModel.autoStopClippingEnabled)
                 audioEngine.setVolume(eqModel.volume)
+            }
+        }
+
+        audioEngine.onPreGainAutoAdjusted = { newPreGain in
+            DispatchQueue.main.async {
+                eqModel.setPreGain(gain: newPreGain)
             }
         }
     }
@@ -121,6 +134,7 @@ struct ContentView: View {
             Group {
                 helpRow(icon: "slider.vertical.3", title: "EQ Sliders", desc: "Drag up to boost, down to cut (±12dB)")
                 helpRow(icon: "arrow.up.and.down.circle", title: "Pre-Gain", desc: "Adjust overall EQ input level before filters")
+                helpRow(icon: "waveform.path.ecg", title: "auto-stop clipping", desc: "Automatically lowers pre-gain if output starts clipping")
                 helpRow(icon: "speaker.wave.2", title: "Volume", desc: "Software volume for HDMI outputs")
                 helpRow(icon: "square.and.arrow.down", title: "Presets", desc: "Select or save EQ configurations")
                 helpRow(icon: "headphones", title: "AutoEQ", desc: "Apply headphone correction curves")
@@ -168,6 +182,20 @@ struct ContentView: View {
         "Treble: Airiness, cymbal shimmer",
         "Air: Sparkle, highest harmonics"
     ]
+
+    private var responseCurvePoints: [EQResponsePoint] {
+        eqModel.responseCurve(sampleRate: Float(audioEngine.processingSampleRate))
+    }
+
+    private var responseGraph: some View {
+        EQResponseGraphView(
+            points: responseCurvePoints,
+            isEnabled: eqModel.isEnabled,
+            sampleRate: audioEngine.processingSampleRate
+        )
+        .frame(height: 154)
+        .help("Actual resulting EQ response across the frequency spectrum")
+    }
 
     private var eqSliders: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -295,6 +323,17 @@ struct ContentView: View {
             Text("Applied before EQ filters")
                 .font(.caption2)
                 .foregroundColor(.secondary)
+
+            Toggle(
+                "auto-stop clipping",
+                isOn: Binding(
+                    get: { eqModel.autoStopClippingEnabled },
+                    set: { eqModel.autoStopClippingEnabled = $0 }
+                )
+            )
+            .toggleStyle(.button)
+            .controlSize(.small)
+            .help("When enabled, clipping is detected on output and pre-gain is automatically reduced to prevent clipping.")
         }
         .opacity(eqModel.isEnabled ? 1.0 : 0.5)
     }
@@ -406,6 +445,7 @@ struct ContentView: View {
                     if let deviceID = newDevice {
                         audioEngine.setInputDevice(deviceID)
                     }
+                    persistSelectedDevices()
                 }
             }
 
@@ -426,6 +466,7 @@ struct ContentView: View {
                     if let deviceID = newDevice {
                         audioEngine.setOutputDevice(deviceID)
                     }
+                    persistSelectedDevices()
                 }
             }
 
@@ -572,6 +613,7 @@ struct ContentView: View {
         audioEngine.setBands(eqModel.parametricBands)
         audioEngine.setBypass(!eqModel.isEnabled)
         audioEngine.setPreGain(eqModel.preGain)
+        audioEngine.setAutoStopClippingEnabled(eqModel.autoStopClippingEnabled)
         audioEngine.setVolume(eqModel.volume)
     }
 
@@ -612,6 +654,8 @@ struct ContentView: View {
     }
 
     private func autoSelectDevicesAndStart() {
+        restoreSavedDeviceSelections()
+
         if selectedInputID == nil, let blackhole = deviceManager.findBlackHole() {
             selectedInputID = blackhole.id
             audioEngine.setInputDevice(blackhole.id)
@@ -622,6 +666,202 @@ struct ContentView: View {
            audioEngine.selectedOutputDeviceID != nil {
             audioEngine.start()
         }
+    }
+
+    private func restoreSavedDeviceSelections() {
+        guard let settings = settingsStore.load() else { return }
+
+        if selectedInputID == nil, let savedInputID = settings.selectedInputDeviceID {
+            let inputID = AudioDeviceID(savedInputID)
+            if deviceManager.inputDevices.contains(where: { $0.id == inputID }) {
+                selectedInputID = inputID
+                audioEngine.setInputDevice(inputID)
+            }
+        }
+
+        if selectedOutputID == nil, let savedOutputID = settings.selectedOutputDeviceID {
+            let outputID = AudioDeviceID(savedOutputID)
+            if deviceManager.outputDevices.contains(where: { $0.id == outputID }) {
+                selectedOutputID = outputID
+                audioEngine.setOutputDevice(outputID)
+            }
+        }
+    }
+
+    private func persistSelectedDevices() {
+        settingsStore.update { settings in
+            settings.selectedInputDeviceID = selectedInputID
+            settings.selectedOutputDeviceID = selectedOutputID
+        }
+    }
+}
+
+private struct EQResponseGraphView: View {
+    let points: [EQResponsePoint]
+    let isEnabled: Bool
+    let sampleRate: Double
+
+    private let frequencyTicks: [Float] = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+    private let labeledFrequencyTicks: [Float] = [20, 100, 1000, 10000, 20000]
+    private let gainTicks: [Float] = [-24, -12, 0, 12, 24]
+    private let gainRange: ClosedRange<Float> = -24...24
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Response")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Text(String(format: "%.1f kHz", sampleRate / 1000.0))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(.secondary)
+            }
+
+            GeometryReader { proxy in
+                let width = proxy.size.width
+                let height = proxy.size.height
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.08))
+
+                    ForEach(gainTicks, id: \.self) { tick in
+                        Path { path in
+                            let y = yPosition(for: tick, in: height)
+                            path.move(to: CGPoint(x: 0, y: y))
+                            path.addLine(to: CGPoint(x: width, y: y))
+                        }
+                        .stroke(
+                            tick == 0 ? Color.secondary.opacity(0.45) : Color.secondary.opacity(0.18),
+                            lineWidth: tick == 0 ? 1.2 : 0.8
+                        )
+                    }
+
+                    ForEach(frequencyTicks, id: \.self) { tick in
+                        Path { path in
+                            let x = xPosition(for: tick, in: width)
+                            path.move(to: CGPoint(x: x, y: 0))
+                            path.addLine(to: CGPoint(x: x, y: height))
+                        }
+                        .stroke(Color.secondary.opacity(0.12), lineWidth: 0.8)
+                    }
+
+                    if points.count > 1 {
+                        responseFillPath(in: CGSize(width: width, height: height))
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.orange.opacity(isEnabled ? 0.18 : 0.08), Color.clear],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+
+                        responsePath(in: CGSize(width: width, height: height))
+                            .stroke(
+                                isEnabled ? Color.orange : Color.secondary,
+                                style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                            )
+                    }
+
+                    ForEach(labeledFrequencyTicks, id: \.self) { tick in
+                        Text(formatFrequency(tick))
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .position(
+                                x: xPosition(for: tick, in: width),
+                                y: height - 8
+                            )
+                    }
+
+                    ForEach(gainTicks, id: \.self) { tick in
+                        Text(formatGain(tick))
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .position(
+                                x: 16,
+                                y: yPosition(for: tick, in: height)
+                            )
+                    }
+                }
+            }
+        }
+    }
+
+    private func responsePath(in size: CGSize) -> Path {
+        var path = Path()
+        guard let first = points.first else { return path }
+
+        path.move(
+            to: CGPoint(
+                x: xPosition(for: first.frequency, in: size.width),
+                y: yPosition(for: first.gainDB, in: size.height)
+            )
+        )
+
+        for point in points.dropFirst() {
+            path.addLine(
+                to: CGPoint(
+                    x: xPosition(for: point.frequency, in: size.width),
+                    y: yPosition(for: point.gainDB, in: size.height)
+                )
+            )
+        }
+
+        return path
+    }
+
+    private func responseFillPath(in size: CGSize) -> Path {
+        var path = Path()
+        guard let first = points.first, let last = points.last else { return path }
+
+        let baselineY = yPosition(for: 0, in: size.height)
+
+        path.move(to: CGPoint(x: xPosition(for: first.frequency, in: size.width), y: baselineY))
+
+        for point in points {
+            path.addLine(
+                to: CGPoint(
+                    x: xPosition(for: point.frequency, in: size.width),
+                    y: yPosition(for: point.gainDB, in: size.height)
+                )
+            )
+        }
+
+        path.addLine(to: CGPoint(x: xPosition(for: last.frequency, in: size.width), y: baselineY))
+        path.closeSubpath()
+        return path
+    }
+
+    private func xPosition(for frequency: Float, in width: CGFloat) -> CGFloat {
+        let clamped = max(EQModel.responseMinFrequency, min(EQModel.responseMaxFrequency, frequency))
+        let minLog = log10f(EQModel.responseMinFrequency)
+        let maxLog = log10f(EQModel.responseMaxFrequency)
+        let valueLog = log10f(clamped)
+        let normalized = (valueLog - minLog) / max(maxLog - minLog, 0.0001)
+        return CGFloat(normalized) * width
+    }
+
+    private func yPosition(for gainDB: Float, in height: CGFloat) -> CGFloat {
+        let clamped = max(gainRange.lowerBound, min(gainRange.upperBound, gainDB))
+        let normalized = (clamped - gainRange.lowerBound) / (gainRange.upperBound - gainRange.lowerBound)
+        return height - (CGFloat(normalized) * height)
+    }
+
+    private func formatFrequency(_ frequency: Float) -> String {
+        if frequency >= 1000 {
+            return "\(Int(frequency / 1000.0))k"
+        }
+        return "\(Int(frequency))"
+    }
+
+    private func formatGain(_ gain: Float) -> String {
+        if gain > 0 {
+            return "+\(Int(gain))"
+        }
+        return "\(Int(gain))"
     }
 }
 
