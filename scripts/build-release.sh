@@ -49,9 +49,6 @@ trap cleanup EXIT
 # Copy app to temporary DMG staging
 cp -R "$APP_PATH" "$STAGING_DIR/"
 
-# Create symbolic link to Applications
-ln -s /Applications "$STAGING_DIR/Applications"
-
 # Create the DMG
 DMG_PATH="$BUILD_DIR/$DMG_NAME.dmg"
 
@@ -75,6 +72,10 @@ if command -v create-dmg >/dev/null 2>&1; then
     mv -f "$TEMP_DMG_PATH" "$DMG_PATH"
 else
     echo "create-dmg not found, using basic hdiutil..."
+
+    # hdiutil needs an explicit Applications symlink in the source folder.
+    ln -s /Applications "$STAGING_DIR/Applications"
+
     hdiutil create -volname "$APP_NAME" \
         -srcfolder "$STAGING_DIR" \
         -ov -format UDZO \
