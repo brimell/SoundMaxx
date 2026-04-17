@@ -63,6 +63,10 @@ struct ContentView: View {
 
             if isCompactLayout {
                 compactOutputControl
+
+                Divider()
+
+                presetControls
             }
 
             if !isCompactLayout {
@@ -227,7 +231,7 @@ struct ContentView: View {
                 Toggle("", isOn: $eqModel.isEnabled)
                     .toggleStyle(.switch)
                     .labelsHidden()
-                    .help("Enable or bypass all processing (pre-gain + EQ filters)")
+                    .help("Enable or bypass all processing (headroom + EQ filters)")
 
                 Text("EQ")
                     .font(.caption)
@@ -237,7 +241,7 @@ struct ContentView: View {
                     .toggleStyle(.switch)
                     .labelsHidden()
                     .disabled(!eqModel.isEnabled)
-                    .help("Bypass only EQ filters while keeping pre-gain active for A/B comparison")
+                    .help("Bypass only EQ filters while keeping headroom active for A/B comparison")
             }
         }
     }
@@ -252,7 +256,7 @@ struct ContentView: View {
             Group {
                 helpRow(icon: "slider.vertical.3", title: "EQ Sliders", desc: "Drag up to boost, down to cut (±12dB)")
                 helpRow(icon: "arrow.up.and.down.circle", title: "Headroom + Volume", desc: "Headroom protects the EQ stage, Volume is post-EQ loudness")
-                helpRow(icon: "arrow.left.arrow.right.square", title: "EQ Switch", desc: "Toggle filters on/off for A/B comparison while keeping pre-gain")
+                helpRow(icon: "arrow.left.arrow.right.square", title: "EQ Switch", desc: "Toggle filters on/off for A/B comparison while keeping headroom")
                 helpRow(icon: "waveform.path.ecg", title: "Output Safety", desc: "Separate EQ clipping, limiter activity, and final output status")
                 helpRow(icon: "speaker.wave.2", title: "Volume", desc: "Software volume for HDMI outputs")
                 helpRow(icon: "square.and.arrow.down", title: "Presets", desc: "Select or save EQ configurations")
@@ -471,7 +475,7 @@ struct ContentView: View {
                     .font(.caption2.monospacedDigit())
                     .foregroundColor(.secondary)
             }
-            .help("Preamp + EQ stage peak/clipping monitor.")
+            .help("Headroom + EQ stage peak/clipping monitor.")
 
             HStack(spacing: 8) {
                 Circle()
@@ -552,7 +556,7 @@ struct ContentView: View {
                 )
                 .toggleStyle(.button)
                 .controlSize(.small)
-                .help("Automatically lowers preamp when the EQ stage clips.")
+                .help("Automatically lowers headroom when the EQ stage clips.")
 
                 Toggle(
                     "Limiter",
@@ -607,7 +611,7 @@ struct ContentView: View {
                     .font(.caption2.monospacedDigit())
                     .foregroundColor(.secondary)
             }
-            .help("Preamp + EQ stage peak/clipping monitor.")
+            .help("Headroom + EQ stage peak/clipping monitor.")
 
             HStack(spacing: 8) {
                 Circle()
