@@ -228,7 +228,13 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                Toggle("", isOn: $eqModel.isEnabled)
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { eqModel.isEnabled },
+                        set: { eqModel.setAudioEnabled($0) }
+                    )
+                )
                     .toggleStyle(.switch)
                     .labelsHidden()
                     .help("Enable or bypass all processing (headroom + EQ filters)")
@@ -237,7 +243,13 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                Toggle("", isOn: $eqModel.isEQFiltersEnabled)
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { eqModel.isEQFiltersEnabled },
+                        set: { eqModel.setFiltersEnabled($0) }
+                    )
+                )
                     .toggleStyle(.switch)
                     .labelsHidden()
                     .disabled(!eqModel.isEnabled)
@@ -469,7 +481,13 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                     .font(.caption)
 
-                Slider(value: $eqModel.volume, in: 0...1)
+                Slider(
+                    value: Binding(
+                        get: { Double(eqModel.volume) },
+                        set: { eqModel.setVolume(Float($0)) }
+                    ),
+                    in: 0...1
+                )
                     .help("Software volume control - macOS disables hardware volume for HDMI outputs")
 
                 Image(systemName: "speaker.wave.3.fill")
@@ -617,7 +635,7 @@ struct ContentView: View {
                     "auto-stop EQ clipping",
                     isOn: Binding(
                         get: { eqModel.autoStopClippingEnabled },
-                        set: { eqModel.autoStopClippingEnabled = $0 }
+                        set: { eqModel.setAutoStopClippingEnabled($0) }
                     )
                 )
                 .toggleStyle(.button)
@@ -1023,6 +1041,20 @@ struct ContentView: View {
                 }
                 .help("Reset all EQ bands to 0dB (flat)")
 
+                Button("Undo") {
+                    eqModel.undo()
+                }
+                .disabled(!eqModel.canUndo)
+                .keyboardShortcut("z", modifiers: [.command])
+                .help("Undo last EQ change")
+
+                Button("Redo") {
+                    eqModel.redo()
+                }
+                .disabled(!eqModel.canRedo)
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                .help("Redo last undone EQ change")
+
                 Button(audioEngine.isRunning ? "Stop" : "Start") {
                     if audioEngine.isRunning {
                         audioEngine.stop()
@@ -1051,6 +1083,16 @@ struct ContentView: View {
                 Button("Reset") {
                     eqModel.reset()
                 }
+
+                Button("Undo") {
+                    eqModel.undo()
+                }
+                .disabled(!eqModel.canUndo)
+
+                Button("Redo") {
+                    eqModel.redo()
+                }
+                .disabled(!eqModel.canRedo)
 
                 Button(audioEngine.isRunning ? "Stop" : "Start") {
                     if audioEngine.isRunning {
@@ -1325,13 +1367,10 @@ struct ContentView: View {
                 let curve = try autoEQManager.parseImportedEQ(content: fileContents)
 
                 if let importedBands = curve.parametricBands, !importedBands.isEmpty {
-                    eqModel.parametricBands = importedBands
+                    eqModel.applyImportedBands(importedBands, preGain: curve.preGain)
                 } else {
-                    eqModel.parametricBands = EQBand.tenBand(withGains: curve.bands)
+                    eqModel.applyImportedBands(EQBand.tenBand(withGains: curve.bands), preGain: curve.preGain)
                 }
-
-                eqModel.setPreGain(gain: curve.preGain)
-                eqModel.clearPresetSelection()
             } catch {
                 eqImportErrorMessage = "Could not parse this EQ file. Use AutoEQ ParametricEQ.txt (or GraphicEQ.txt) format."
                 showingEQImportError = true

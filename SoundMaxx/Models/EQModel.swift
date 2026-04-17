@@ -2,6 +2,20 @@ import SwiftUI
 import Combine
 
 class EQModel: ObservableObject {
+    private struct HistorySnapshot: Equatable {
+        var parametricBands: [EQBand]
+        var isEnabled: Bool
+        var isEQFiltersEnabled: Bool
+        var preGain: Float
+        var outputGain: Float
+        var limiterEnabled: Bool
+        var limiterCeilingDB: Float
+        var autoStopClippingEnabled: Bool
+        var volume: Float
+        var selectedBuiltInPresetName: String?
+        var selectedCustomPresetID: String?
+    }
+
     @Published var parametricBands: [EQBand] = EQBand.defaultTenBand
     @Published var isEnabled: Bool = true
     @Published var isEQFiltersEnabled: Bool = true
@@ -19,6 +33,8 @@ class EQModel: ObservableObject {
     @Published var currentDeviceName: String?
     @Published var hasDeviceProfile: Bool = false
     @Published var autoSaveEnabled: Bool = true
+    @Published private(set) var canUndo: Bool = false
+    @Published private(set) var canRedo: Bool = false
 
     static let frequencyLabels = ["32", "64", "125", "250", "500", "1K", "2K", "4K", "8K", "16K"]
     static let minimumBandCount = 1
@@ -40,6 +56,13 @@ class EQModel: ObservableObject {
     private let legacyEnabledKey = "eq_enabled"
     private let legacyBuiltInPresetKey = "eq_builtin_preset"
     private let legacyAutoStopClippingKey = "eq_auto_stop_clipping"
+    private var undoHistory: [HistorySnapshot] = []
+    private var redoHistory: [HistorySnapshot] = []
+    private var isApplyingHistorySnapshot = false
+    private var lastHistoryContext: String?
+    private var lastHistoryContextTime: TimeInterval = 0
+    private let historyMergeWindow: TimeInterval = 0.35
+    private let maxHistoryDepth = 180
 
     private static func clampPreGain(_ value: Float) -> Float {
         min(max(value, preGainRange.lowerBound), preGainRange.upperBound)
@@ -51,6 +74,7 @@ class EQModel: ObservableObject {
 
     init() {
         loadSettings()
+        clearHistory()
 
         $parametricBands
             .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
@@ -134,6 +158,8 @@ class EQModel: ObservableObject {
         } else {
             hasDeviceProfile = false
         }
+
+        clearHistory()
     }
 
     func saveCurrentAsDeviceProfile() {
@@ -210,6 +236,7 @@ class EQModel: ObservableObject {
     }
 
     func applyBuiltInPreset(_ preset: BuiltInPreset) {
+        recordHistorySnapshot(context: "preset-built-in")
         selectedBuiltInPreset = preset
         selectedCustomPreset = nil
         pendingCustomPresetID = nil
@@ -219,6 +246,7 @@ class EQModel: ObservableObject {
     }
 
     func applyCustomPreset(_ preset: CustomPreset) {
+        recordHistorySnapshot(context: "preset-custom")
         selectedCustomPreset = preset
         selectedBuiltInPreset = nil
         pendingCustomPresetID = nil
@@ -259,6 +287,7 @@ class EQModel: ObservableObject {
 
     func setBandGain(index: Int, gain: Float) {
         guard parametricBands.indices.contains(index) else { return }
+        recordHistorySnapshot(context: "band-\(index)-gain")
         var updatedBands = parametricBands
         updatedBands[index].gain = min(max(gain, -24.0), 24.0)
         parametricBands = updatedBands
@@ -267,6 +296,7 @@ class EQModel: ObservableObject {
 
     func setBandFrequency(index: Int, frequency: Float) {
         guard parametricBands.indices.contains(index) else { return }
+        recordHistorySnapshot(context: "band-\(index)-frequency")
         var updatedBands = parametricBands
         updatedBands[index].frequency = min(max(frequency, 20.0), 20000.0)
         parametricBands = updatedBands
@@ -275,6 +305,7 @@ class EQModel: ObservableObject {
 
     func setBandQ(index: Int, q: Float) {
         guard parametricBands.indices.contains(index) else { return }
+        recordHistorySnapshot(context: "band-\(index)-q")
         var updatedBands = parametricBands
         updatedBands[index].q = min(max(q, 0.2), 12.0)
         parametricBands = updatedBands
@@ -283,6 +314,7 @@ class EQModel: ObservableObject {
 
     func setBandType(index: Int, type: EQFilterType) {
         guard parametricBands.indices.contains(index) else { return }
+        recordHistorySnapshot(context: "band-\(index)-type")
         var updatedBands = parametricBands
         updatedBands[index].type = type
         parametricBands = updatedBands
@@ -291,6 +323,7 @@ class EQModel: ObservableObject {
 
     func setBandEnabled(index: Int, isEnabled: Bool) {
         guard parametricBands.indices.contains(index) else { return }
+        recordHistorySnapshot(context: "band-\(index)-enabled")
         var updatedBands = parametricBands
         updatedBands[index].isEnabled = isEnabled
         parametricBands = updatedBands
@@ -302,6 +335,7 @@ class EQModel: ObservableObject {
     }
 
     func addBand(after index: Int?) {
+        recordHistorySnapshot(context: "band-add")
         let insertionIndex: Int
         if let index, parametricBands.indices.contains(index) {
             insertionIndex = index + 1
@@ -327,6 +361,7 @@ class EQModel: ObservableObject {
 
     func removeLastBand() {
         guard parametricBands.count > Self.minimumBandCount else { return }
+        recordHistorySnapshot(context: "band-remove-last")
         var updatedBands = parametricBands
         updatedBands.removeLast()
         parametricBands = updatedBands
@@ -336,6 +371,7 @@ class EQModel: ObservableObject {
     func removeBand(at index: Int) {
         guard parametricBands.count > Self.minimumBandCount else { return }
         guard parametricBands.indices.contains(index) else { return }
+        recordHistorySnapshot(context: "band-remove-\(index)")
         var updatedBands = parametricBands
         updatedBands.remove(at: index)
         parametricBands = updatedBands
@@ -381,23 +417,144 @@ class EQModel: ObservableObject {
     }
 
     func setPreGain(gain: Float) {
+        recordHistorySnapshot(context: "pre-gain")
         preGain = Self.clampPreGain(gain)
         clearPresetSelection()
     }
 
     func setOutputGain(gain: Float) {
+        recordHistorySnapshot(context: "output-gain")
         outputGain = Self.clampOutputGain(gain)
         clearPresetSelection()
     }
 
     func setLimiterEnabled(_ enabled: Bool) {
+        recordHistorySnapshot(context: "limiter-enabled")
         limiterEnabled = enabled
         clearPresetSelection()
     }
 
     func setLimiterCeilingDB(_ value: Float) {
+        recordHistorySnapshot(context: "limiter-ceiling")
         limiterCeilingDB = min(max(value, -6.0), -0.1)
         clearPresetSelection()
+    }
+
+    func setAudioEnabled(_ enabled: Bool) {
+        recordHistorySnapshot(context: "audio-enabled")
+        isEnabled = enabled
+    }
+
+    func setFiltersEnabled(_ enabled: Bool) {
+        recordHistorySnapshot(context: "filters-enabled")
+        isEQFiltersEnabled = enabled
+    }
+
+    func setAutoStopClippingEnabled(_ enabled: Bool) {
+        recordHistorySnapshot(context: "auto-stop-clipping")
+        autoStopClippingEnabled = enabled
+        clearPresetSelection()
+    }
+
+    func setVolume(_ value: Float) {
+        recordHistorySnapshot(context: "volume")
+        volume = min(max(value, 0.0), 1.0)
+    }
+
+    func applyImportedBands(_ bands: [EQBand], preGain: Float) {
+        recordHistorySnapshot(context: "imported-bands")
+        parametricBands = bands
+        self.preGain = Self.clampPreGain(preGain)
+        clearPresetSelection()
+    }
+
+    func undo() {
+        guard let previousSnapshot = undoHistory.popLast() else { return }
+        redoHistory.append(makeHistorySnapshot())
+        applyHistorySnapshot(previousSnapshot)
+        updateHistoryAvailability()
+    }
+
+    func redo() {
+        guard let nextSnapshot = redoHistory.popLast() else { return }
+        undoHistory.append(makeHistorySnapshot())
+        applyHistorySnapshot(nextSnapshot)
+        updateHistoryAvailability()
+    }
+
+    private func makeHistorySnapshot() -> HistorySnapshot {
+        HistorySnapshot(
+            parametricBands: parametricBands,
+            isEnabled: isEnabled,
+            isEQFiltersEnabled: isEQFiltersEnabled,
+            preGain: preGain,
+            outputGain: outputGain,
+            limiterEnabled: limiterEnabled,
+            limiterCeilingDB: limiterCeilingDB,
+            autoStopClippingEnabled: autoStopClippingEnabled,
+            volume: volume,
+            selectedBuiltInPresetName: selectedBuiltInPreset?.rawValue,
+            selectedCustomPresetID: selectedCustomPreset?.id.uuidString ?? pendingCustomPresetID
+        )
+    }
+
+    private func applyHistorySnapshot(_ snapshot: HistorySnapshot) {
+        isApplyingHistorySnapshot = true
+        parametricBands = snapshot.parametricBands
+        isEnabled = snapshot.isEnabled
+        isEQFiltersEnabled = snapshot.isEQFiltersEnabled
+        preGain = snapshot.preGain
+        outputGain = snapshot.outputGain
+        limiterEnabled = snapshot.limiterEnabled
+        limiterCeilingDB = snapshot.limiterCeilingDB
+        autoStopClippingEnabled = snapshot.autoStopClippingEnabled
+        volume = snapshot.volume
+        applyStoredPresetSelection(
+            builtInPresetName: snapshot.selectedBuiltInPresetName,
+            customPresetID: snapshot.selectedCustomPresetID
+        )
+        isApplyingHistorySnapshot = false
+    }
+
+    private func recordHistorySnapshot(context: String) {
+        guard !isLoadingProfile, !isApplyingHistorySnapshot else { return }
+
+        let now = Date().timeIntervalSinceReferenceDate
+        if context == lastHistoryContext, now - lastHistoryContextTime <= historyMergeWindow {
+            return
+        }
+
+        let snapshot = makeHistorySnapshot()
+        if let last = undoHistory.last, last == snapshot {
+            return
+        }
+
+        undoHistory.append(snapshot)
+        if undoHistory.count > maxHistoryDepth {
+            undoHistory.removeFirst(undoHistory.count - maxHistoryDepth)
+        }
+
+        lastHistoryContext = context
+        lastHistoryContextTime = now
+
+        if !redoHistory.isEmpty {
+            redoHistory.removeAll()
+        }
+
+        updateHistoryAvailability()
+    }
+
+    private func clearHistory() {
+        undoHistory.removeAll()
+        redoHistory.removeAll()
+        lastHistoryContext = nil
+        lastHistoryContextTime = 0
+        updateHistoryAvailability()
+    }
+
+    private func updateHistoryAvailability() {
+        canUndo = !undoHistory.isEmpty
+        canRedo = !redoHistory.isEmpty
     }
 
     private func saveSettings() {

@@ -219,12 +219,10 @@ struct AutoEQView: View {
             switch result {
             case .success(let curve):
                 if let importedBands = curve.parametricBands, !importedBands.isEmpty {
-                    eqModel.parametricBands = importedBands
+                    eqModel.applyImportedBands(importedBands, preGain: curve.preGain)
                 } else {
-                    eqModel.parametricBands = EQBand.tenBand(withGains: curve.bands)
+                    eqModel.applyImportedBands(EQBand.tenBand(withGains: curve.bands), preGain: curve.preGain)
                 }
-                eqModel.setPreGain(gain: curve.preGain)
-                eqModel.clearPresetSelection()
             case .failure:
                 selectedHeadphone = nil
             }
