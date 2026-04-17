@@ -2,9 +2,18 @@ import SwiftUI
 import CoreAudio
 import UniformTypeIdentifiers
 
+enum ContentViewLayout {
+    case compact
+    case full
+}
+
 struct ContentView: View {
+    let layout: ContentViewLayout
+    let advancedWindowID: String?
+
     @EnvironmentObject var audioEngine: AudioEngine
     @EnvironmentObject var eqModel: EQModel
+    @Environment(\.openWindow) private var openWindow
     @StateObject private var deviceManager = AudioDeviceManager()
     @StateObject private var presetManager = PresetManager()
 
@@ -22,15 +31,28 @@ struct ContentView: View {
     private let settingsStore = AppSettingsStore.shared
     private let autoEQManager = AutoEQManager.shared
 
-    private let menuWidth: CGFloat = 800
+    private var menuWidth: CGFloat {
+        isCompactLayout ? 640 : 800
+    }
+
+    private var isCompactLayout: Bool {
+        layout == .compact
+    }
+
+    init(layout: ContentViewLayout = .full, advancedWindowID: String? = nil) {
+        self.layout = layout
+        self.advancedWindowID = advancedWindowID
+    }
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: isCompactLayout ? 12 : 16) {
             header
 
             Divider()
 
-            responseGraph
+            if !isCompactLayout {
+                responseGraph
+            }
 
             eqSliders
 
@@ -41,19 +63,21 @@ struct ContentView: View {
                 volumeControl
             }
 
-            Divider()
+            if !isCompactLayout {
+                Divider()
 
-            presetControls
+                presetControls
 
-            Divider()
+                Divider()
 
-            deviceControls
+                deviceControls
 
-            Divider()
+                Divider()
+            }
 
             footer
         }
-        .padding(18)
+        .padding(isCompactLayout ? 14 : 18)
         .frame(width: menuWidth)
         .font(.system(size: 14))
         .onAppear {
@@ -262,7 +286,9 @@ struct ContentView: View {
                         tooltip: bandTooltip(index)
                     )
 
-                    inlineBandControls(index)
+                    if !isCompactLayout {
+                        inlineBandControls(index)
+                    }
                 }
             }
         }
@@ -349,6 +375,63 @@ struct ContentView: View {
     }
 
     private var preGainControl: some View {
+        Group {
+            if isCompactLayout {
+                compactPreGainControl
+            } else {
+                advancedPreGainControl
+            }
+        }
+        .opacity(eqModel.isEnabled ? 1.0 : 0.5)
+    }
+
+    private var compactPreGainControl: some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text("Preamp")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 55, alignment: .leading)
+
+                Slider(
+                    value: Binding(
+                        get: { Double(eqModel.preGain) },
+                        set: { eqModel.setPreGain(gain: Float($0)) }
+                    ),
+                    in: -24...24,
+                    step: 0.1
+                )
+
+                Text(String(format: "%+.1f dB", eqModel.preGain))
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.secondary)
+                    .frame(width: 62, alignment: .trailing)
+            }
+
+            HStack {
+                Text("Output")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 55, alignment: .leading)
+
+                Slider(
+                    value: Binding(
+                        get: { Double(eqModel.outputGain) },
+                        set: { eqModel.setOutputGain(gain: Float($0)) }
+                    ),
+                    in: -24...24,
+                    step: 0.1
+                )
+
+                Text(String(format: "%+.1f dB", eqModel.outputGain))
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.secondary)
+                    .frame(width: 62, alignment: .trailing)
+            }
+        }
+    }
+
+    private var advancedPreGainControl: some View {
         VStack(spacing: 4) {
             HStack {
                 Text("Preamp")
@@ -481,7 +564,6 @@ struct ContentView: View {
             }
             .help("Final post-limiter output peak/clipping monitor.")
         }
-        .opacity(eqModel.isEnabled ? 1.0 : 0.5)
     }
 
     private var eqPeakLabel: String {
@@ -703,6 +785,16 @@ struct ContentView: View {
     }
 
     private var footer: some View {
+        Group {
+            if isCompactLayout {
+                compactFooter
+            } else {
+                fullFooter
+            }
+        }
+    }
+
+    private var fullFooter: some View {
         VStack(spacing: 8) {
             HStack {
                 Toggle("Launch at Login", isOn: $launchAtLogin.isEnabled)
@@ -737,6 +829,42 @@ struct ContentView: View {
                     NSApplication.shared.terminate(nil)
                 }
                 .help("Quit SoundMaxx")
+            }
+        }
+    }
+
+    private var compactFooter: some View {
+        VStack(spacing: 8) {
+            HStack {
+                statusIndicator
+
+                Spacer()
+
+                Button("Reset") {
+                    eqModel.reset()
+                }
+
+                Button(audioEngine.isRunning ? "Stop" : "Start") {
+                    if audioEngine.isRunning {
+                        audioEngine.stop()
+                    } else {
+                        audioEngine.start()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+
+            HStack {
+                Button("Advanced Options") {
+                    openAdvancedWindow()
+                }
+                .disabled(advancedWindowID == nil)
+
+                Spacer()
+
+                Button("Quit") {
+                    NSApplication.shared.terminate(nil)
+                }
             }
         }
     }
@@ -849,6 +977,13 @@ struct ContentView: View {
            audioEngine.selectedOutputDeviceID != nil {
             audioEngine.start()
         }
+    }
+
+    private func openAdvancedWindow() {
+        guard let windowID = advancedWindowID else { return }
+
+        openWindow(id: windowID)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func restoreSavedDeviceSelections() {

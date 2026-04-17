@@ -1,7 +1,6 @@
 import SwiftUI
 import AVFoundation
 import CoreAudio
-import AppKit
 
 @main
 struct SoundMaxxApp: App {
@@ -22,17 +21,19 @@ struct SoundMaxxApp: App {
     }
 
     var body: some Scene {
-        Window("SoundMaxx", id: Self.mainWindowID) {
-            ContentView()
+        MenuBarExtra("SoundMaxx", systemImage: "slider.horizontal.3") {
+            ContentView(layout: .compact, advancedWindowID: Self.mainWindowID)
                 .environmentObject(audioEngine)
                 .environmentObject(eqModel)
         }
-        .defaultSize(width: 840, height: 900)
+        .menuBarExtraStyle(.window)
 
-        MenuBarExtra("SoundMaxx", systemImage: "slider.horizontal.3") {
-            AppMenu(mainWindowID: Self.mainWindowID)
+        Window("SoundMaxx Advanced", id: Self.mainWindowID) {
+            ContentView(layout: .full)
+                .environmentObject(audioEngine)
+                .environmentObject(eqModel)
         }
-        .menuBarExtraStyle(.menu)
+        .defaultSize(width: 900, height: 920)
     }
 
     private static func requestMicrophonePermissionAndStart(audioEngine: AudioEngine, eqModel: EQModel) {
@@ -138,24 +139,5 @@ struct SoundMaxxApp: App {
         audioEngine.setLimiterCeilingDB(eqModel.limiterCeilingDB)
         audioEngine.setAutoStopClippingEnabled(eqModel.autoStopClippingEnabled)
         audioEngine.setVolume(eqModel.volume)
-    }
-}
-
-private struct AppMenu: View {
-    let mainWindowID: String
-
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Button("Open SoundMaxx") {
-            openWindow(id: mainWindowID)
-            NSApp.activate(ignoringOtherApps: true)
-        }
-
-        Divider()
-
-        Button("Quit SoundMaxx") {
-            NSApplication.shared.terminate(nil)
-        }
     }
 }
