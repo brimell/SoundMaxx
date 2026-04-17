@@ -50,9 +50,7 @@ struct ContentView: View {
 
             Divider()
 
-            if !isCompactLayout {
-                responseGraph
-            }
+            responseGraph
 
             eqSliders
 
@@ -253,9 +251,9 @@ struct ContentView: View {
 
             Group {
                 helpRow(icon: "slider.vertical.3", title: "EQ Sliders", desc: "Drag up to boost, down to cut (±12dB)")
-                helpRow(icon: "arrow.up.and.down.circle", title: "Preamp + Output", desc: "Preamp controls EQ headroom, Output controls loudness")
+                helpRow(icon: "arrow.up.and.down.circle", title: "Headroom + Volume", desc: "Headroom protects the EQ stage, Volume is post-EQ loudness")
                 helpRow(icon: "arrow.left.arrow.right.square", title: "EQ Switch", desc: "Toggle filters on/off for A/B comparison while keeping pre-gain")
-                helpRow(icon: "waveform.path.ecg", title: "Clip Monitoring", desc: "Separate EQ-stage and output-stage clipping indicators")
+                helpRow(icon: "waveform.path.ecg", title: "Output Safety", desc: "Separate EQ clipping, limiter activity, and final output status")
                 helpRow(icon: "speaker.wave.2", title: "Volume", desc: "Software volume for HDMI outputs")
                 helpRow(icon: "square.and.arrow.down", title: "Presets", desc: "Select or save EQ configurations")
                 helpRow(icon: "headphones", title: "AutoEQ", desc: "Apply headphone correction curves")
@@ -315,7 +313,7 @@ struct ContentView: View {
             isEnabled: eqModel.isEnabled && eqModel.isEQFiltersEnabled,
             sampleRate: audioEngine.processingSampleRate
         )
-        .frame(height: 154)
+        .frame(height: isCompactLayout ? 120 : 154)
         .help("Actual resulting EQ response across the frequency spectrum")
     }
 
@@ -434,28 +432,7 @@ struct ContentView: View {
     private var compactPreGainControl: some View {
         VStack(spacing: 4) {
             HStack {
-                Text("Preamp")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(width: 55, alignment: .leading)
-
-                Slider(
-                    value: Binding(
-                        get: { Double(eqModel.preGain) },
-                        set: { eqModel.setPreGain(gain: Float($0)) }
-                    ),
-                    in: -24...24,
-                    step: 0.1
-                )
-
-                Text(String(format: "%+.1f dB", eqModel.preGain))
-                    .font(.caption.monospacedDigit())
-                    .foregroundColor(.secondary)
-                    .frame(width: 62, alignment: .trailing)
-            }
-
-            HStack {
-                Text("Output")
+                Text("Volume")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .frame(width: 55, alignment: .leading)
@@ -465,7 +442,7 @@ struct ContentView: View {
                         get: { Double(eqModel.outputGain) },
                         set: { eqModel.setOutputGain(gain: Float($0)) }
                     ),
-                    in: -24...24,
+                    in: Double(EQModel.outputGainRange.lowerBound)...Double(EQModel.outputGainRange.upperBound),
                     step: 0.1
                 )
 
@@ -474,6 +451,10 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                     .frame(width: 62, alignment: .trailing)
             }
+
+            Text("Headroom is available in Advanced Options")
+                .font(.caption2)
+                .foregroundColor(.secondary)
 
             HStack(spacing: 8) {
                 Circle()
@@ -494,12 +475,12 @@ struct ContentView: View {
 
             HStack(spacing: 8) {
                 Circle()
-                    .fill(audioEngine.outputStageClippingDetected ? Color.red : Color.secondary.opacity(0.28))
+                    .fill(outputStatusIndicatorColor)
                     .frame(width: 8, height: 8)
 
-                Text(audioEngine.outputStageClippingDetected ? "Output stage clipping" : "Output stage clean")
+                Text(outputStatusText)
                     .font(.caption2.weight(.semibold))
-                    .foregroundColor(audioEngine.outputStageClippingDetected ? .red : .secondary)
+                    .foregroundColor(outputStatusColor)
 
                 Spacer()
 
@@ -507,14 +488,14 @@ struct ContentView: View {
                     .font(.caption2.monospacedDigit())
                     .foregroundColor(.secondary)
             }
-            .help("Final post-limiter output peak/clipping monitor.")
+            .help("Post-EQ limiter activity and final output clipping monitor.")
         }
     }
 
     private var advancedPreGainControl: some View {
         VStack(spacing: 4) {
             HStack {
-                Text("Preamp")
+                Text("Headroom")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .frame(width: 55, alignment: .leading)
@@ -524,7 +505,7 @@ struct ContentView: View {
                         get: { Double(eqModel.preGain) },
                         set: { eqModel.setPreGain(gain: Float($0)) }
                     ),
-                    in: -24...24,
+                    in: Double(EQModel.preGainRange.lowerBound)...Double(EQModel.preGainRange.upperBound),
                     step: 0.1
                 )
                 .help("Headroom control before EQ filters. Keep this negative when EQ has positive boosts.")
@@ -536,7 +517,7 @@ struct ContentView: View {
             }
 
             HStack {
-                Text("Output")
+                Text("Volume")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .frame(width: 55, alignment: .leading)
@@ -546,7 +527,7 @@ struct ContentView: View {
                         get: { Double(eqModel.outputGain) },
                         set: { eqModel.setOutputGain(gain: Float($0)) }
                     ),
-                    in: -24...24,
+                    in: Double(EQModel.outputGainRange.lowerBound)...Double(EQModel.outputGainRange.upperBound),
                     step: 0.1
                 )
                 .help("User loudness control after EQ and before limiter.")
@@ -557,7 +538,7 @@ struct ContentView: View {
                     .frame(width: 62, alignment: .trailing)
             }
 
-            Text("Signal chain: Input -> Preamp -> EQ -> Output Gain -> Limiter -> Output")
+            Text("Signal chain: Input -> Headroom -> EQ -> Volume -> Limiter -> Output")
                 .font(.caption2)
                 .foregroundColor(.secondary)
 
@@ -630,12 +611,12 @@ struct ContentView: View {
 
             HStack(spacing: 8) {
                 Circle()
-                    .fill(audioEngine.outputStageClippingDetected ? Color.red : Color.secondary.opacity(0.28))
+                    .fill(outputStatusIndicatorColor)
                     .frame(width: 8, height: 8)
 
-                Text(audioEngine.outputStageClippingDetected ? "Output stage clipping" : "Output stage clean")
+                Text(outputStatusText)
                     .font(.caption2.weight(.semibold))
-                    .foregroundColor(audioEngine.outputStageClippingDetected ? .red : .secondary)
+                    .foregroundColor(outputStatusColor)
 
                 Spacer()
 
@@ -643,7 +624,7 @@ struct ContentView: View {
                     .font(.caption2.monospacedDigit())
                     .foregroundColor(.secondary)
             }
-            .help("Final post-limiter output peak/clipping monitor.")
+            .help("Post-EQ limiter activity and final output clipping monitor.")
         }
     }
 
@@ -653,6 +634,36 @@ struct ContentView: View {
 
     private var outputPeakLabel: String {
         peakLabel(from: audioEngine.outputPeakSample, prefix: "Out")
+    }
+
+    private var outputStatusText: String {
+        if audioEngine.outputStageClippingDetected {
+            return "Output clipping"
+        }
+        if audioEngine.outputLimiterEngaged {
+            return "Output limited"
+        }
+        return "Output clean"
+    }
+
+    private var outputStatusColor: Color {
+        if audioEngine.outputStageClippingDetected {
+            return .red
+        }
+        if audioEngine.outputLimiterEngaged {
+            return .orange
+        }
+        return .secondary
+    }
+
+    private var outputStatusIndicatorColor: Color {
+        if audioEngine.outputStageClippingDetected {
+            return .red
+        }
+        if audioEngine.outputLimiterEngaged {
+            return .orange
+        }
+        return Color.secondary.opacity(0.28)
     }
 
     private func peakLabel(from peak: Float, prefix: String) -> String {
