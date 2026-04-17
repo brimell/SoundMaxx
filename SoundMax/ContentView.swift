@@ -13,7 +13,6 @@ struct ContentView: View {
     @State private var showingAutoEQ = false
     @State private var showingHelp = false
     @State private var newPresetName = ""
-    @State private var selectedBandIndex = 0
     @State private var didInitialStartup = false
     @StateObject private var launchAtLogin = LaunchAtLogin()
 
@@ -24,7 +23,6 @@ struct ContentView: View {
             Divider()
 
             eqSliders
-            bandEditor
 
             // Volume slider for HDMI/devices without hardware volume
             if audioEngine.outputDeviceNeedsVolumeControl {
@@ -162,18 +160,19 @@ struct ContentView: View {
     ]
 
     private var eqSliders: some View {
-        HStack(spacing: 6) {
+        HStack(alignment: .top, spacing: 6) {
             ForEach(eqModel.parametricBands.indices, id: \.self) { index in
-                EQSliderView(
-                    value: Binding(
-                        get: { eqModel.parametricBands[index].gain },
-                        set: { eqModel.setBandGain(index: index, gain: $0) }
-                    ),
-                    label: bandFrequencyLabel(index),
-                    tooltip: bandTooltip(index)
-                )
-                .onTapGesture {
-                    selectedBandIndex = index
+                VStack(spacing: 4) {
+                    EQSliderView(
+                        value: Binding(
+                            get: { eqModel.parametricBands[index].gain },
+                            set: { eqModel.setBandGain(index: index, gain: $0) }
+                        ),
+                        label: bandFrequencyLabel(index),
+                        tooltip: bandTooltip(index)
+                    )
+
+                    inlineBandControls(index)
                 }
             }
         }
@@ -181,106 +180,56 @@ struct ContentView: View {
         .disabled(!eqModel.isEnabled)
     }
 
-    private var bandEditor: some View {
-        guard eqModel.parametricBands.indices.contains(selectedBandIndex) else {
-            return AnyView(EmptyView())
-        }
+    private func inlineBandControls(_ index: Int) -> some View {
+        let band = eqModel.parametricBands[index]
 
-        let selectedBand = eqModel.parametricBands[selectedBandIndex]
-
-        return AnyView(
-            VStack(spacing: 8) {
-                HStack {
-                    Text("Band")
-                        .foregroundColor(.secondary)
-
-                    Picker("", selection: $selectedBandIndex) {
-                        ForEach(eqModel.parametricBands.indices, id: \.self) { index in
-                            Text("\(index + 1)").tag(index)
-                        }
+        return VStack(spacing: 3) {
+            Menu {
+                ForEach(EQFilterType.allCases) { type in
+                    Button(type.displayName) {
+                        eqModel.setBandType(index: index, type: type)
                     }
-                    .labelsHidden()
-                    .frame(width: 70)
-
-                    Text("\(bandFrequencyLabel(selectedBandIndex)) Hz")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Toggle("Enabled", isOn: Binding(
-                        get: { selectedBand.isEnabled },
-                        set: { eqModel.setBandEnabled(index: selectedBandIndex, isEnabled: $0) }
-                    ))
-                    .toggleStyle(.checkbox)
-                    .font(.caption)
                 }
-
-                HStack {
-                    Text("Type")
-                        .foregroundColor(.secondary)
-                        .frame(width: 60, alignment: .leading)
-
-                    Picker("", selection: Binding(
-                        get: { selectedBand.type },
-                        set: { eqModel.setBandType(index: selectedBandIndex, type: $0) }
-                    )) {
-                        ForEach(EQFilterType.allCases) { type in
-                            Text(type.displayName).tag(type)
-                        }
-                    }
-                    .labelsHidden()
+            } label: {
+                Text(shortFilterTypeName(band.type))
+                    .font(.system(size: 9, weight: .semibold))
+                    .lineLimit(1)
                     .frame(maxWidth: .infinity)
-                }
-
-                HStack {
-                    Text("Freq")
-                        .foregroundColor(.secondary)
-                        .frame(width: 60, alignment: .leading)
-
-                    Slider(value: logFrequencyBinding, in: logFrequencyRange)
-
-                    Text(String(format: "%.0f Hz", selectedBand.frequency))
-                        .font(.caption)
-                        .frame(width: 65, alignment: .trailing)
-                }
-
-                HStack {
-                    Text("Q")
-                        .foregroundColor(.secondary)
-                        .frame(width: 60, alignment: .leading)
-
-                    Slider(value: Binding(
-                        get: { Double(selectedBand.q) },
-                        set: { eqModel.setBandQ(index: selectedBandIndex, q: Float($0)) }
-                    ), in: 0.2...12.0)
-
-                    Text(String(format: "%.2f", selectedBand.q))
-                        .font(.caption)
-                        .frame(width: 65, alignment: .trailing)
-                }
-
-                HStack {
-                    Text("Gain")
-                        .foregroundColor(.secondary)
-                        .frame(width: 60, alignment: .leading)
-
-                    Slider(value: Binding(
-                        get: { Double(selectedBand.gain) },
-                        set: { eqModel.setBandGain(index: selectedBandIndex, gain: Float($0)) }
-                    ), in: -12.0...12.0)
-                    .disabled(!selectedBand.type.supportsGain)
-
-                    Text(String(format: "%+.1f dB", selectedBand.gain))
-                        .font(.caption)
-                        .frame(width: 65, alignment: .trailing)
-                        .foregroundColor(selectedBand.type.supportsGain ? .secondary : .secondary.opacity(0.5))
-                }
+                    .padding(.vertical, 2)
+                    .background(Color.gray.opacity(0.16))
+                    .cornerRadius(4)
             }
-            .padding(8)
-            .background(Color.gray.opacity(0.08))
-            .cornerRadius(8)
-        )
+            .buttonStyle(.plain)
+
+            TextField(
+                "Freq",
+                value: Binding(
+                    get: { Double(eqModel.parametricBands[index].frequency) },
+                    set: { eqModel.setBandFrequency(index: index, frequency: Float($0)) }
+                ),
+                format: .number.precision(.fractionLength(0))
+            )
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.mini)
+            .font(.system(size: 8, weight: .medium, design: .monospaced))
+            .multilineTextAlignment(.center)
+            .help("Frequency (Hz)")
+
+            TextField(
+                "Q",
+                value: Binding(
+                    get: { Double(eqModel.parametricBands[index].q) },
+                    set: { eqModel.setBandQ(index: index, q: Float($0)) }
+                ),
+                format: .number.precision(.fractionLength(2))
+            )
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.mini)
+            .font(.system(size: 8, weight: .medium, design: .monospaced))
+            .multilineTextAlignment(.center)
+            .help("Q factor")
+        }
+        .frame(width: 50)
     }
 
     private var volumeControl: some View {
@@ -583,23 +532,6 @@ struct ContentView: View {
         audioEngine.setBypass(!eqModel.isEnabled)
     }
 
-    private var logFrequencyRange: ClosedRange<Double> {
-        log10(20.0)...log10(20000.0)
-    }
-
-    private var logFrequencyBinding: Binding<Double> {
-        Binding(
-            get: {
-                guard eqModel.parametricBands.indices.contains(selectedBandIndex) else { return log10(1000.0) }
-                return log10(Double(max(20.0, min(20000.0, eqModel.parametricBands[selectedBandIndex].frequency))))
-            },
-            set: { logValue in
-                let frequency = Float(pow(10.0, logValue))
-                eqModel.setBandFrequency(index: selectedBandIndex, frequency: frequency)
-            }
-        )
-    }
-
     private func bandFrequencyLabel(_ index: Int) -> String {
         guard eqModel.parametricBands.indices.contains(index) else { return "-" }
         let frequency = eqModel.parametricBands[index].frequency
@@ -615,6 +547,25 @@ struct ContentView: View {
         let frequencyText = String(format: "%.0f", band.frequency)
         let qText = String(format: "%.2f", band.q)
         return "\(band.type.displayName): \(frequencyText)Hz, Q \(qText), Gain \(Int(band.gain))dB"
+    }
+
+    private func shortFilterTypeName(_ type: EQFilterType) -> String {
+        switch type {
+        case .peak:
+            return "Peak"
+        case .lowShelf:
+            return "LS"
+        case .highShelf:
+            return "HS"
+        case .lowPass:
+            return "LP"
+        case .highPass:
+            return "HP"
+        case .notch:
+            return "Notch"
+        case .bandPass:
+            return "BP"
+        }
     }
 
     private func autoSelectDevicesAndStart() {

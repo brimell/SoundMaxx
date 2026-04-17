@@ -137,19 +137,19 @@ class EQModel: ObservableObject {
 
     func setBandGain(index: Int, gain: Float) {
         guard parametricBands.indices.contains(index) else { return }
-        parametricBands[index].gain = gain
+        parametricBands[index].gain = min(max(gain, -24.0), 24.0)
         clearPresetSelection()
     }
 
     func setBandFrequency(index: Int, frequency: Float) {
         guard parametricBands.indices.contains(index) else { return }
-        parametricBands[index].frequency = frequency
+        parametricBands[index].frequency = min(max(frequency, 20.0), 20000.0)
         clearPresetSelection()
     }
 
     func setBandQ(index: Int, q: Float) {
         guard parametricBands.indices.contains(index) else { return }
-        parametricBands[index].q = q
+        parametricBands[index].q = min(max(q, 0.2), 12.0)
         clearPresetSelection()
     }
 
