@@ -66,12 +66,13 @@ struct EQSliderView: View {
                     }
             )
 
-            // Frequency label
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundColor(.secondary)
+            if !label.isEmpty {
+                Text(label)
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+            }
         }
-        .help(tooltip.isEmpty ? "Adjust \(label)Hz frequency (±12dB)" : tooltip)
+        .help(tooltip.isEmpty ? (label.isEmpty ? "Adjust gain (±12dB)" : "Adjust \(label)Hz frequency (±12dB)") : tooltip)
     }
 
     private var formattedValue: String {

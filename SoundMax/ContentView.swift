@@ -16,8 +16,10 @@ struct ContentView: View {
     @State private var didInitialStartup = false
     @StateObject private var launchAtLogin = LaunchAtLogin()
 
+    private let menuWidth: CGFloat = 520
+
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             header
 
             Divider()
@@ -41,8 +43,8 @@ struct ContentView: View {
 
             footer
         }
-        .padding()
-        .frame(width: 440)
+        .padding(16)
+        .frame(width: menuWidth)
         .onAppear {
             setupDeviceChangeCallback()
             syncEQToEngine()
@@ -127,20 +129,20 @@ struct ContentView: View {
             }
         }
         .padding()
-        .frame(width: 280)
+        .frame(width: 340)
     }
 
     private func helpRow(icon: String, title: String, desc: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
-                .frame(width: 20)
+                .frame(width: 24)
                 .foregroundColor(.accentColor)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                 Text(desc)
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundColor(.secondary)
             }
         }
@@ -160,7 +162,7 @@ struct ContentView: View {
     ]
 
     private var eqSliders: some View {
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .top, spacing: 8) {
             ForEach(eqModel.parametricBands.indices, id: \.self) { index in
                 VStack(spacing: 4) {
                     EQSliderView(
@@ -168,7 +170,7 @@ struct ContentView: View {
                             get: { eqModel.parametricBands[index].gain },
                             set: { eqModel.setBandGain(index: index, gain: $0) }
                         ),
-                        label: bandFrequencyLabel(index),
+                        label: "",
                         tooltip: bandTooltip(index)
                     )
 
@@ -183,7 +185,7 @@ struct ContentView: View {
     private func inlineBandControls(_ index: Int) -> some View {
         let band = eqModel.parametricBands[index]
 
-        return VStack(spacing: 3) {
+        return VStack(spacing: 4) {
             Menu {
                 ForEach(EQFilterType.allCases) { type in
                     Button(type.displayName) {
@@ -192,10 +194,10 @@ struct ContentView: View {
                 }
             } label: {
                 Text(shortFilterTypeName(band.type))
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 2)
+                    .padding(.vertical, 3)
                     .background(Color.gray.opacity(0.16))
                     .cornerRadius(4)
             }
@@ -210,8 +212,8 @@ struct ContentView: View {
                 format: .number.precision(.fractionLength(0))
             )
             .textFieldStyle(.roundedBorder)
-            .controlSize(.mini)
-            .font(.system(size: 8, weight: .medium, design: .monospaced))
+            .controlSize(.small)
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
             .multilineTextAlignment(.center)
             .help("Frequency (Hz)")
 
@@ -224,12 +226,12 @@ struct ContentView: View {
                 format: .number.precision(.fractionLength(2))
             )
             .textFieldStyle(.roundedBorder)
-            .controlSize(.mini)
-            .font(.system(size: 8, weight: .medium, design: .monospaced))
+            .controlSize(.small)
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
             .multilineTextAlignment(.center)
             .help("Q factor")
         }
-        .frame(width: 50)
+        .frame(width: 60)
     }
 
     private var volumeControl: some View {
