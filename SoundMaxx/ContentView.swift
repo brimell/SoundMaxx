@@ -474,6 +474,40 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                     .frame(width: 62, alignment: .trailing)
             }
+
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(audioEngine.eqStageClippingDetected ? Color.red : Color.secondary.opacity(0.28))
+                    .frame(width: 8, height: 8)
+
+                Text(audioEngine.eqStageClippingDetected ? "EQ stage clipping" : "EQ stage clean")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(audioEngine.eqStageClippingDetected ? .red : .secondary)
+
+                Spacer()
+
+                Text(eqPeakLabel)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(.secondary)
+            }
+            .help("Preamp + EQ stage peak/clipping monitor.")
+
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(audioEngine.outputStageClippingDetected ? Color.red : Color.secondary.opacity(0.28))
+                    .frame(width: 8, height: 8)
+
+                Text(audioEngine.outputStageClippingDetected ? "Output stage clipping" : "Output stage clean")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(audioEngine.outputStageClippingDetected ? .red : .secondary)
+
+                Spacer()
+
+                Text(outputPeakLabel)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(.secondary)
+            }
+            .help("Final post-limiter output peak/clipping monitor.")
         }
     }
 
