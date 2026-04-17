@@ -21,6 +21,8 @@ class EQModel: ObservableObject {
     @Published var autoSaveEnabled: Bool = true
 
     static let frequencyLabels = ["32", "64", "125", "250", "500", "1K", "2K", "4K", "8K", "16K"]
+    static let preGainRange: ClosedRange<Float> = -12.0...0.0
+    static let outputGainRange: ClosedRange<Float> = -40.0...40.0
 
     var legacyGains: [Float] {
         parametricBands.map { $0.gain }
@@ -30,12 +32,21 @@ class EQModel: ObservableObject {
     private let profileManager = DeviceProfileManager.shared
     private let settingsStore = AppSettingsStore.shared
     private var isLoadingProfile = false
+    private var pendingCustomPresetID: String?
     private let legacyParametricBandsKey = "eq_parametric_bands"
     private let legacyPreGainKey = "eq_pre_gain"
     private let legacyBandsKey = "eq_bands"
     private let legacyEnabledKey = "eq_enabled"
     private let legacyBuiltInPresetKey = "eq_builtin_preset"
     private let legacyAutoStopClippingKey = "eq_auto_stop_clipping"
+
+    private static func clampPreGain(_ value: Float) -> Float {
+        min(max(value, preGainRange.lowerBound), preGainRange.upperBound)
+    }
+
+    private static func clampOutputGain(_ value: Float) -> Float {
+        min(max(value, outputGainRange.lowerBound), outputGainRange.upperBound)
+    }
 
     init() {
         loadSettings()
@@ -140,7 +151,9 @@ class EQModel: ObservableObject {
             autoStopClippingEnabled: autoStopClippingEnabled,
             volume: volume,
             isEQEnabled: isEnabled,
-            isEQFiltersEnabled: isEQFiltersEnabled
+            isEQFiltersEnabled: isEQFiltersEnabled,
+            selectedBuiltInPresetName: selectedBuiltInPreset?.rawValue,
+            selectedCustomPresetID: selectedCustomPreset?.id.uuidString ?? pendingCustomPresetID
         )
         hasDeviceProfile = true
     }
@@ -154,15 +167,18 @@ class EQModel: ObservableObject {
     private func loadFromProfile(_ profile: DeviceProfile) {
         isLoadingProfile = true
         parametricBands = profile.effectiveBands
-        preGain = profile.preGain
-        outputGain = profile.outputGain
+        preGain = Self.clampPreGain(profile.preGain)
+        outputGain = Self.clampOutputGain(profile.outputGain)
         limiterEnabled = profile.limiterEnabled
         limiterCeilingDB = profile.limiterCeilingDB
         autoStopClippingEnabled = profile.autoStopClippingEnabled
         volume = profile.volume
         isEnabled = profile.isEQEnabled
         isEQFiltersEnabled = profile.isEQFiltersEnabled
-        clearPresetSelection()
+        applyStoredPresetSelection(
+            builtInPresetName: profile.selectedBuiltInPresetName,
+            customPresetID: profile.selectedCustomPresetID
+        )
         isLoadingProfile = false
     }
 
@@ -186,13 +202,16 @@ class EQModel: ObservableObject {
             autoStopClippingEnabled: autoStopClippingEnabled,
             volume: volume,
             isEQEnabled: isEnabled,
-            isEQFiltersEnabled: isEQFiltersEnabled
+            isEQFiltersEnabled: isEQFiltersEnabled,
+            selectedBuiltInPresetName: selectedBuiltInPreset?.rawValue,
+            selectedCustomPresetID: selectedCustomPreset?.id.uuidString ?? pendingCustomPresetID
         )
     }
 
     func applyBuiltInPreset(_ preset: BuiltInPreset) {
         selectedBuiltInPreset = preset
         selectedCustomPreset = nil
+        pendingCustomPresetID = nil
         parametricBands = preset.bands
         preGain = 0.0
         outputGain = 0.0
@@ -201,9 +220,10 @@ class EQModel: ObservableObject {
     func applyCustomPreset(_ preset: CustomPreset) {
         selectedCustomPreset = preset
         selectedBuiltInPreset = nil
+        pendingCustomPresetID = nil
         parametricBands = preset.effectiveBands
-        preGain = preset.preGain
-        outputGain = preset.outputGain
+        preGain = Self.clampPreGain(preset.preGain)
+        outputGain = Self.clampOutputGain(preset.outputGain)
         limiterEnabled = preset.limiterEnabled
         limiterCeilingDB = preset.limiterCeilingDB
     }
@@ -215,6 +235,25 @@ class EQModel: ObservableObject {
     func clearPresetSelection() {
         selectedBuiltInPreset = nil
         selectedCustomPreset = nil
+        pendingCustomPresetID = nil
+    }
+
+    func resolvePresetSelection(using customPresets: [CustomPreset]) {
+        if let pendingCustomPresetID,
+           let pendingUUID = UUID(uuidString: pendingCustomPresetID),
+           let resolvedPreset = customPresets.first(where: { $0.id == pendingUUID }) {
+            selectedBuiltInPreset = nil
+            selectedCustomPreset = resolvedPreset
+            self.pendingCustomPresetID = nil
+            return
+        }
+
+        guard let selectedCustomPreset else { return }
+        if let updatedPreset = customPresets.first(where: { $0.id == selectedCustomPreset.id }) {
+            self.selectedCustomPreset = updatedPreset
+        } else {
+            clearPresetSelection()
+        }
     }
 
     func setBandGain(index: Int, gain: Float) {
@@ -258,12 +297,12 @@ class EQModel: ObservableObject {
     }
 
     func setPreGain(gain: Float) {
-        preGain = min(max(gain, -24.0), 24.0)
+        preGain = Self.clampPreGain(gain)
         clearPresetSelection()
     }
 
     func setOutputGain(gain: Float) {
-        outputGain = min(max(gain, -24.0), 24.0)
+        outputGain = Self.clampOutputGain(gain)
         clearPresetSelection()
     }
 
@@ -296,11 +335,33 @@ class EQModel: ObservableObject {
             } else if let preset = selectedCustomPreset {
                 settings.selectedBuiltInPresetName = nil
                 settings.selectedCustomPresetID = preset.id.uuidString
+            } else if let pendingCustomPresetID {
+                settings.selectedBuiltInPresetName = nil
+                settings.selectedCustomPresetID = pendingCustomPresetID
             } else {
                 settings.selectedBuiltInPresetName = nil
                 settings.selectedCustomPresetID = nil
             }
         }
+    }
+
+    private func applyStoredPresetSelection(builtInPresetName: String?, customPresetID: String?) {
+        if let builtInPresetName,
+           let preset = BuiltInPreset(rawValue: builtInPresetName) {
+            selectedBuiltInPreset = preset
+            selectedCustomPreset = nil
+            pendingCustomPresetID = nil
+            return
+        }
+
+        if let customPresetID {
+            selectedBuiltInPreset = nil
+            selectedCustomPreset = nil
+            pendingCustomPresetID = customPresetID
+            return
+        }
+
+        clearPresetSelection()
     }
 
     private func loadSettings() {
@@ -310,8 +371,8 @@ class EQModel: ObservableObject {
             }
             isEnabled = settings.isEnabled
             isEQFiltersEnabled = settings.isEQFiltersEnabled
-            preGain = settings.preGain
-            outputGain = settings.outputGain
+            preGain = Self.clampPreGain(settings.preGain)
+            outputGain = Self.clampOutputGain(settings.outputGain)
             limiterEnabled = settings.limiterEnabled
             limiterCeilingDB = settings.limiterCeilingDB
             autoStopClippingEnabled = settings.autoStopClippingEnabled
@@ -322,6 +383,11 @@ class EQModel: ObservableObject {
                let preset = BuiltInPreset(rawValue: presetName) {
                 selectedBuiltInPreset = preset
                 selectedCustomPreset = nil
+                pendingCustomPresetID = nil
+            } else if let customPresetID = settings.selectedCustomPresetID {
+                selectedBuiltInPreset = nil
+                selectedCustomPreset = nil
+                pendingCustomPresetID = customPresetID
             }
             return
         }
@@ -335,7 +401,7 @@ class EQModel: ObservableObject {
         }
 
         isEnabled = UserDefaults.standard.object(forKey: legacyEnabledKey) as? Bool ?? true
-        preGain = UserDefaults.standard.object(forKey: legacyPreGainKey) as? Float ?? 0.0
+        preGain = Self.clampPreGain(UserDefaults.standard.object(forKey: legacyPreGainKey) as? Float ?? 0.0)
         outputGain = 0.0
         limiterEnabled = true
         limiterCeilingDB = -1.0
@@ -345,6 +411,7 @@ class EQModel: ObservableObject {
            let preset = BuiltInPreset(rawValue: presetName) {
             selectedBuiltInPreset = preset
             selectedCustomPreset = nil
+            pendingCustomPresetID = nil
         }
 
         // Migrate from legacy UserDefaults keys to JSON save file on first launch after upgrade.

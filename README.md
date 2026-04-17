@@ -14,9 +14,9 @@ Project website: [https://brimell.github.io/SoundMax/](https://brimell.github.io
 - **Built-in Presets** - Flat, Bass Boost, Treble Boost, Vocal, Rock, Electronic, Acoustic
 - **Custom Presets** - Save and load your own EQ configurations
 - **Per-Device Profiles** - Save EQ per output device, auto-restore on switch, and auto-save ongoing tweaks
-- **Proper Gain Staging** - Separate preamp (headroom) and output gain (loudness) controls
+- **Proper Gain Staging** - Separate headroom (-12 to 0 dB) and post-EQ volume (-40 to +40 dB)
 - **Limiter / Clip Guard** - Final output safety stage with configurable ceiling (default: -1 dBFS)
-- **Dual Clip Meters** - Independent EQ-stage and output-stage clipping indicators
+- **Output Safety Status** - Separate EQ-stage clipping and post-EQ output status (limited/clipping)
 - **HDMI Volume Control** - Software volume slider for HDMI outputs (macOS disables hardware control)
 - **Global Output Switch Shortcut** - Press Control+Option+Command+O to cycle to the next output device instantly
 - **AutoEQ Integration** - Search and apply headphone correction curves from [AutoEQ](https://github.com/jaakkopasanen/AutoEq)
@@ -97,7 +97,7 @@ xcodebuild -project SoundMaxx.xcodeproj -scheme SoundMaxx -configuration Release
 ```
 ┌─────────────┐    ┌───────────┐    ┌──────────────────────────────────────┐    ┌─────────────┐
 │  Your Apps  │ →  │ BlackHole │ →  │               SoundMaxx              │ →  │  Speakers   │
-│ (Spotify,   │    │   (2ch)   │    │ Preamp → EQ → Output Gain → Limiter │    │ (Real Audio │
+│ (Spotify,   │    │   (2ch)   │    │ Headroom → EQ → Volume → Limiter    │    │ (Real Audio │
 │  YouTube)   │    │           │    │                                      │    │   Output)   │
 └─────────────┘    └───────────┘    └──────────────────────────────────────┘    └─────────────┘
 ```

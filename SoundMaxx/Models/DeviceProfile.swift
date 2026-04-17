@@ -9,14 +9,16 @@ struct DeviceProfile: Codable, Identifiable {
     let deviceName: String
     var eqBands: [Double]  // 10 bands, -12 to +12
     var parametricBands: [EQBand]?
-    var preGain: Float     // -24.0 to +24.0
-    var outputGain: Float  // -24.0 to +24.0
+    var preGain: Float     // -12.0 to 0.0 (headroom)
+    var outputGain: Float  // -40.0 to +40.0
     var limiterEnabled: Bool
     var limiterCeilingDB: Float
     var autoStopClippingEnabled: Bool
     var volume: Float      // 0.0 to 1.0 (for HDMI/software volume)
     var isEQEnabled: Bool
     var isEQFiltersEnabled: Bool
+    var selectedBuiltInPresetName: String?
+    var selectedCustomPresetID: String?
 
     init(
         deviceUID: String,
@@ -30,7 +32,9 @@ struct DeviceProfile: Codable, Identifiable {
         autoStopClippingEnabled: Bool = false,
         volume: Float = 1.0,
         isEQEnabled: Bool = true,
-        isEQFiltersEnabled: Bool = true
+        isEQFiltersEnabled: Bool = true,
+        selectedBuiltInPresetName: String? = nil,
+        selectedCustomPresetID: String? = nil
     ) {
         self.deviceUID = deviceUID
         self.deviceName = deviceName
@@ -44,6 +48,8 @@ struct DeviceProfile: Codable, Identifiable {
         self.volume = volume
         self.isEQEnabled = isEQEnabled
         self.isEQFiltersEnabled = isEQFiltersEnabled
+        self.selectedBuiltInPresetName = selectedBuiltInPresetName
+        self.selectedCustomPresetID = selectedCustomPresetID
     }
 
     var effectiveBands: [EQBand] {
@@ -66,6 +72,8 @@ struct DeviceProfile: Codable, Identifiable {
         case volume
         case isEQEnabled
         case isEQFiltersEnabled
+        case selectedBuiltInPresetName
+        case selectedCustomPresetID
     }
 
     init(from decoder: Decoder) throws {
@@ -83,6 +91,8 @@ struct DeviceProfile: Codable, Identifiable {
         volume = try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0
         isEQEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEQEnabled) ?? true
         isEQFiltersEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEQFiltersEnabled) ?? true
+        selectedBuiltInPresetName = try container.decodeIfPresent(String.self, forKey: .selectedBuiltInPresetName)
+        selectedCustomPresetID = try container.decodeIfPresent(String.self, forKey: .selectedCustomPresetID)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -100,6 +110,8 @@ struct DeviceProfile: Codable, Identifiable {
         try container.encode(volume, forKey: .volume)
         try container.encode(isEQEnabled, forKey: .isEQEnabled)
         try container.encode(isEQFiltersEnabled, forKey: .isEQFiltersEnabled)
+        try container.encode(selectedBuiltInPresetName, forKey: .selectedBuiltInPresetName)
+        try container.encode(selectedCustomPresetID, forKey: .selectedCustomPresetID)
     }
 }
 
@@ -139,7 +151,9 @@ class DeviceProfileManager: ObservableObject {
         autoStopClippingEnabled: Bool,
         volume: Float,
         isEQEnabled: Bool,
-        isEQFiltersEnabled: Bool
+        isEQFiltersEnabled: Bool,
+        selectedBuiltInPresetName: String? = nil,
+        selectedCustomPresetID: String? = nil
     ) {
         let profile = DeviceProfile(
             deviceUID: deviceUID,
@@ -153,7 +167,9 @@ class DeviceProfileManager: ObservableObject {
             autoStopClippingEnabled: autoStopClippingEnabled,
             volume: volume,
             isEQEnabled: isEQEnabled,
-            isEQFiltersEnabled: isEQFiltersEnabled
+            isEQFiltersEnabled: isEQFiltersEnabled,
+            selectedBuiltInPresetName: selectedBuiltInPresetName,
+            selectedCustomPresetID: selectedCustomPresetID
         )
         saveProfile(profile)
     }

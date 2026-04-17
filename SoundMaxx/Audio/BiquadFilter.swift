@@ -217,7 +217,7 @@ class ParametricEQ {
 
     func setPreGain(_ gain: Float) {
         updateLock.lock()
-        pendingPreGainDB = max(-24.0, min(24.0, gain))
+        pendingPreGainDB = max(-12.0, min(0.0, gain))
         updateLock.unlock()
     }
 
@@ -323,7 +323,7 @@ class OutputLimiter {
         ceilingLinear = powf(10.0, ceilingDB / 20.0)
     }
 
-    func process(left: Float, right: Float) -> (left: Float, right: Float) {
+    func process(left: Float, right: Float) -> (left: Float, right: Float, wasLimited: Bool) {
         let stereoPeak = max(max(fabsf(left), fabsf(right)), 1e-9)
         let desiredGain = min(1.0, ceilingLinear / stereoPeak)
 
@@ -340,7 +340,8 @@ class OutputLimiter {
         outLeft = max(-ceilingLinear, min(ceilingLinear, outLeft))
         outRight = max(-ceilingLinear, min(ceilingLinear, outRight))
 
-        return (outLeft, outRight)
+        let wasLimited = desiredGain < 0.9999 || currentGain < 0.9999
+        return (outLeft, outRight, wasLimited)
     }
 
     func reset() {

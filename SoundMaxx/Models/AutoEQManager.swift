@@ -495,7 +495,7 @@ class AutoEQManager: ObservableObject {
             return 0.0
         }
 
-        return max(-24.0, min(24.0, preampValue))
+        return max(-12.0, min(0.0, preampValue))
     }
 
     // MARK: - Interpolation

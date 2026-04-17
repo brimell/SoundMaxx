@@ -50,7 +50,9 @@ struct ContentView: View {
 
             Divider()
 
-            responseGraph
+            if !isCompactLayout {
+                responseGraph
+            }
 
             eqSliders
 
@@ -63,10 +65,6 @@ struct ContentView: View {
 
             if isCompactLayout {
                 compactOutputControl
-
-                Divider()
-
-                presetControls
             }
 
             if !isCompactLayout {
@@ -88,6 +86,7 @@ struct ContentView: View {
         .font(.system(size: 14))
         .onAppear {
             setupDeviceChangeCallback()
+            eqModel.resolvePresetSelection(using: presetManager.customPresets)
             syncEQToEngine()
             if !didInitialStartup {
                 autoSelectDevicesAndStart()
@@ -130,6 +129,9 @@ struct ContentView: View {
         }
         .onChange(of: eqModel.volume) { newValue in
             audioEngine.setVolume(newValue)
+        }
+        .onChange(of: presetManager.customPresets) { newPresets in
+            eqModel.resolvePresetSelection(using: newPresets)
         }
         .sheet(isPresented: $showingSavePreset) {
             savePresetSheet
@@ -182,6 +184,7 @@ struct ContentView: View {
         audioEngine.onOutputDeviceChanged = { _, uid, name in
             DispatchQueue.main.async {
                 eqModel.onDeviceChanged(deviceUID: uid, deviceName: name)
+                eqModel.resolvePresetSelection(using: presetManager.customPresets)
                 audioEngine.setBands(eqModel.parametricBands)
                 audioEngine.setBypass(!eqModel.isEnabled)
                 audioEngine.setEQFiltersEnabled(eqModel.isEQFiltersEnabled)

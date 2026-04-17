@@ -33,6 +33,7 @@ class AudioEngine: ObservableObject {
     @Published var autoStopClippingEnabled: Bool = false
     @Published private(set) var eqStagePeakSample: Float = 0.0
     @Published private(set) var eqStageClippingDetected: Bool = false
+    @Published private(set) var outputLimiterEngaged: Bool = false
     @Published private(set) var outputPeakSample: Float = 0.0
     @Published private(set) var outputStageClippingDetected: Bool = false
 
@@ -46,11 +47,13 @@ class AudioEngine: ObservableObject {
     private let clippingIndicatorHoldDuration: TimeInterval = 1.0
     private let meterPublishInterval: TimeInterval = 1.0 / 20.0
     private var eqClippingHoldUntilTime: TimeInterval = 0
+    private var limiterEngagedHoldUntilTime: TimeInterval = 0
     private var outputClippingHoldUntilTime: TimeInterval = 0
     private var lastMeterPublishTime: TimeInterval = 0
     private var lastEQMeterPeakSample: Float = 0.0
     private var lastOutputMeterPeakSample: Float = 0.0
     private var lastEQMeterClippingDetected = false
+    private var lastLimiterEngagedState = false
     private var lastOutputMeterClippingDetected = false
 
     // Device info
@@ -72,12 +75,12 @@ class AudioEngine: ObservableObject {
     }
 
     func setPreGain(_ gain: Float) {
-        preGain = max(-24.0, min(24.0, gain))
+        preGain = max(-12.0, min(0.0, gain))
         parametricEQ?.setPreGain(preGain)
     }
 
     func setOutputGain(_ gain: Float) {
-        outputGain = max(-24.0, min(24.0, gain))
+        outputGain = max(-40.0, min(40.0, gain))
     }
 
     func setLimiterEnabled(_ enabled: Bool) {
@@ -642,9 +645,10 @@ class AudioEngine: ObservableObject {
         }
 
         // Apply final limiter / clip guard.
+        var limiterEngagedInBlock = false
         if processingEnabled, limiterEnabled, let limiter = outputLimiter {
             limiter.setCeilingDB(limiterCeilingDB)
-            applyLimiter(limiter, to: ioData, frameCount: Int(inNumberFrames))
+            limiterEngagedInBlock = applyLimiter(limiter, to: ioData, frameCount: Int(inNumberFrames))
         }
 
         // Apply final software volume (mainly for outputs without hardware volume control).
@@ -664,7 +668,11 @@ class AudioEngine: ObservableObject {
             }
         }
 
-        publishStagePeaks(eqStagePeakSample: eqStagePeak, outputStagePeakSample: outputStagePeak)
+        publishStagePeaks(
+            eqStagePeakSample: eqStagePeak,
+            outputStagePeakSample: outputStagePeak,
+            limiterEngaged: limiterEngagedInBlock
+        )
 
         return noErr
     }
@@ -673,9 +681,9 @@ class AudioEngine: ObservableObject {
         _ limiter: OutputLimiter,
         to ioData: UnsafeMutablePointer<AudioBufferList>,
         frameCount: Int
-    ) {
+    ) -> Bool {
         let bufferListPtr = UnsafeMutableAudioBufferListPointer(ioData)
-        guard !bufferListPtr.isEmpty else { return }
+        guard !bufferListPtr.isEmpty else { return false }
 
         let leftData = bufferListPtr.indices.contains(0)
             ? bufferListPtr[0].mData?.assumingMemoryBound(to: Float.self)
@@ -684,17 +692,22 @@ class AudioEngine: ObservableObject {
             ? bufferListPtr[1].mData?.assumingMemoryBound(to: Float.self)
             : nil
 
+        var limiterEngaged = false
+
         // Stereo-linked limiting; mono streams use the same value for both sides.
         for frame in 0..<frameCount {
             let leftIn = leftData?[frame] ?? 0.0
             let rightIn = rightData?[frame] ?? leftIn
             let limited = limiter.process(left: leftIn, right: rightIn)
+            limiterEngaged = limiterEngaged || limited.wasLimited
 
             leftData?[frame] = limited.left
             if rightData != nil {
                 rightData?[frame] = limited.right
             }
         }
+
+        return limiterEngaged
     }
 
     private func reducePreGainIfClipping(_ peakSample: Float) {
@@ -707,7 +720,7 @@ class AudioEngine: ObservableObject {
         guard requiredReductionDB > 0 else { return }
 
         let currentPreGain = preGain
-        let newPreGain = max(-24.0, currentPreGain - requiredReductionDB)
+        let newPreGain = max(-12.0, currentPreGain - requiredReductionDB)
         guard newPreGain < currentPreGain - 0.05 else { return }
 
         lastAutoPreGainAdjustmentTime = now
@@ -720,20 +733,25 @@ class AudioEngine: ObservableObject {
         }
     }
 
-    private func publishStagePeaks(eqStagePeakSample: Float, outputStagePeakSample: Float) {
+    private func publishStagePeaks(eqStagePeakSample: Float, outputStagePeakSample: Float, limiterEngaged: Bool) {
         let now = Date().timeIntervalSinceReferenceDate
         if eqStagePeakSample > 1.0 {
             eqClippingHoldUntilTime = now + clippingIndicatorHoldDuration
+        }
+        if limiterEngaged {
+            limiterEngagedHoldUntilTime = now + clippingIndicatorHoldDuration
         }
         if outputStagePeakSample > 1.0 {
             outputClippingHoldUntilTime = now + clippingIndicatorHoldDuration
         }
 
         let eqClippingActive = now <= eqClippingHoldUntilTime
+        let limiterActive = now <= limiterEngagedHoldUntilTime
         let outputClippingActive = now <= outputClippingHoldUntilTime
 
         let clippingStateChanged =
             (eqClippingActive != lastEQMeterClippingDetected) ||
+            (limiterActive != lastLimiterEngagedState) ||
             (outputClippingActive != lastOutputMeterClippingDetected)
 
         let peakChangedEnough =
@@ -748,12 +766,14 @@ class AudioEngine: ObservableObject {
         lastEQMeterPeakSample = eqStagePeakSample
         lastOutputMeterPeakSample = outputStagePeakSample
         lastEQMeterClippingDetected = eqClippingActive
+        lastLimiterEngagedState = limiterActive
         lastOutputMeterClippingDetected = outputClippingActive
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.eqStagePeakSample = eqStagePeakSample
             self.eqStageClippingDetected = eqClippingActive
+            self.outputLimiterEngaged = limiterActive
             self.outputPeakSample = outputStagePeakSample
             self.outputStageClippingDetected = outputClippingActive
             self.clippingDetected = outputClippingActive
@@ -762,17 +782,20 @@ class AudioEngine: ObservableObject {
 
     private func resetClippingMeterState() {
         eqClippingHoldUntilTime = 0
+        limiterEngagedHoldUntilTime = 0
         outputClippingHoldUntilTime = 0
         lastMeterPublishTime = 0
         lastEQMeterPeakSample = 0
         lastOutputMeterPeakSample = 0
         lastEQMeterClippingDetected = false
+        lastLimiterEngagedState = false
         lastOutputMeterClippingDetected = false
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.eqStagePeakSample = 0
             self.eqStageClippingDetected = false
+            self.outputLimiterEngaged = false
             self.outputPeakSample = 0
             self.outputStageClippingDetected = false
             self.clippingDetected = false

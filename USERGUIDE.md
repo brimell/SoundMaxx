@@ -131,15 +131,16 @@ Use the toggle switch in the header to quickly bypass the EQ and hear your origi
 
 SoundMaxx uses a proper gain chain:
 
-`Input -> Preamp -> EQ -> Output Gain -> Limiter -> Output`
+`Input -> Headroom -> EQ -> Volume -> Limiter -> Output`
 
-- **Preamp**: headroom control before EQ. If you have boosted EQ bands, keep preamp negative.
-- **Output Gain**: user loudness control after EQ.
+- **Headroom**: pre-EQ safety control, range **-12 dB to 0 dB**. Keep this at or below 0 dB.
+- **Volume**: post-EQ loudness control, range **-40 dB to +40 dB**.
 - **Limiter**: final clip guard with configurable ceiling (default -1 dBFS).
 
-Two clip indicators are shown in the app:
-- **EQ stage clipping**: clipping before output gain/limiter.
-- **Output stage clipping**: clipping at the final output.
+Output safety indicators are shown in the app:
+- **EQ stage clipping**: clipping before post-EQ volume/limiter.
+- **Output limited**: limiter is actively reducing gain.
+- **Output clipping**: clipping at the final output stage.
 
 ### Reset
 
