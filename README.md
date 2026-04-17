@@ -84,7 +84,7 @@ brew install xcodegen
 
 # Clone and build
 git clone https://github.com/brimell/SoundMaxx.git
-cd SoundMax
+cd SoundMaxx
 xcodegen generate
 xcodebuild -project SoundMaxx.xcodeproj -scheme SoundMaxx -configuration Release build
 ```
@@ -357,7 +357,7 @@ Useful options:
 ./scripts/publish-release.sh --tag v1.0.1 --title "SoundMaxx v1.0.1" --notes "Release notes here"
 
 # Publish to a specific repository
-./scripts/publish-release.sh --repo brimell/SoundMax
+./scripts/publish-release.sh --repo brimell/SoundMaxx
 ```
 
 Behavior:
