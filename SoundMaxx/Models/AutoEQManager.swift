@@ -73,10 +73,51 @@ class AutoEQManager: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        let urlString = headphone.graphicEQURL
+        fetchText(at: headphone.parametricEQURL) { [weak self] parametricResult in
+            guard let self = self else { return }
+
+            switch parametricResult {
+            case .success(let content):
+                do {
+                    let curve = try self.parseParametricEQ(content)
+                    self.isLoading = false
+                    completion(.success(curve))
+                } catch {
+                    self.fetchGraphicEQ(for: headphone, completion: completion)
+                }
+
+            case .failure:
+                self.fetchGraphicEQ(for: headphone, completion: completion)
+            }
+        }
+    }
+
+    private func fetchGraphicEQ(for headphone: AutoEQHeadphone, completion: @escaping (Result<AutoEQCurve, Error>) -> Void) {
+        fetchText(at: headphone.graphicEQURL) { [weak self] result in
+            guard let self = self else { return }
+
+            self.isLoading = false
+
+            switch result {
+            case .success(let content):
+                do {
+                    let curve = try self.parseGraphicEQ(content)
+                    completion(.success(curve))
+                } catch {
+                    self.errorMessage = "Could not parse EQ data"
+                    completion(.failure(error))
+                }
+
+            case .failure(let error):
+                self.errorMessage = error.localizedDescription
+                completion(.failure(error))
+            }
+        }
+    }
+
+    private func fetchText(at urlString: String, completion: @escaping (Result<String, Error>) -> Void) {
+
         guard let url = URL(string: urlString) else {
-            isLoading = false
-            errorMessage = "Invalid URL"
             completion(.failure(AutoEQError.invalidURL))
             return
         }
@@ -86,44 +127,28 @@ class AutoEQManager: ObservableObject {
 
         session.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
-                self?.isLoading = false
-
                 if let error = error {
-                    self?.errorMessage = error.localizedDescription
                     completion(.failure(error))
                     return
                 }
 
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    self?.errorMessage = "Invalid response from server"
                     completion(.failure(AutoEQError.invalidResponse))
                     return
                 }
 
                 guard (200 ... 299).contains(httpResponse.statusCode) else {
-                    if httpResponse.statusCode == 404 {
-                        self?.errorMessage = "EQ data not found for this headphone"
-                        completion(.failure(AutoEQError.notFound))
-                    } else {
-                        self?.errorMessage = "AutoEQ server error (\(httpResponse.statusCode))"
-                        completion(.failure(AutoEQError.invalidResponse))
-                    }
+                    let statusError: Error = httpResponse.statusCode == 404 ? AutoEQError.notFound : AutoEQError.invalidResponse
+                    completion(.failure(statusError))
                     return
                 }
 
                 guard let data = data, let content = String(data: data, encoding: .utf8) else {
-                    self?.errorMessage = "Could not read response"
                     completion(.failure(AutoEQError.invalidResponse))
                     return
                 }
 
-                do {
-                    let curve = try self?.parseGraphicEQ(content) ?? AutoEQCurve(bands: [], preGain: 0.0)
-                    completion(.success(curve))
-                } catch {
-                    self?.errorMessage = "Could not parse EQ data"
-                    completion(.failure(error))
-                }
+                completion(.success(content))
             }
         }.resume()
     }
@@ -294,6 +319,117 @@ class AutoEQManager: ObservableObject {
 
     // MARK: - Parse GraphicEQ Format
 
+    private func parseParametricEQ(_ content: String) throws -> AutoEQCurve {
+        let lines = content.components(separatedBy: .newlines)
+        let preGain = parsePreamp(lines)
+
+        let parsedBands = lines.compactMap { parseParametricFilterLine($0) }
+        guard !parsedBands.isEmpty else {
+            throw AutoEQError.parseError
+        }
+
+        return AutoEQCurve(
+            bands: parsedBands.map { $0.gain },
+            preGain: preGain,
+            parametricBands: parsedBands
+        )
+    }
+
+    private func parseParametricFilterLine(_ line: String) -> EQBand? {
+        let tokens = line
+            .replacingOccurrences(of: ":", with: " ")
+            .split(whereSeparator: { $0.isWhitespace })
+            .map(String.init)
+
+        guard !tokens.isEmpty else { return nil }
+
+        let upperTokens = tokens.map { $0.uppercased() }
+        guard upperTokens.first == "FILTER" else { return nil }
+
+        var isEnabled = true
+        var typeToken: String?
+
+        if let stateIndex = upperTokens.firstIndex(where: { $0 == "ON" || $0 == "OFF" }) {
+            isEnabled = upperTokens[stateIndex] == "ON"
+            if upperTokens.indices.contains(stateIndex + 1) {
+                typeToken = upperTokens[stateIndex + 1]
+            }
+        }
+
+        if typeToken == nil {
+            typeToken = upperTokens.first(where: {
+                ["PK", "PEAK", "LS", "LSC", "LOWSHELF", "HS", "HSC", "HIGHSHELF", "LP", "LPF", "LOWPASS", "HP", "HPF", "HIGHPASS", "NO", "NOTCH", "BP", "BPF", "BANDPASS"].contains($0)
+            })
+        }
+
+        guard let resolvedTypeToken = typeToken,
+              let type = mapFilterType(token: resolvedTypeToken) else {
+            return nil
+        }
+
+        guard let frequencyIndex = upperTokens.firstIndex(of: "FC"),
+              upperTokens.indices.contains(frequencyIndex + 1),
+              let frequency = parseFloatToken(tokens[frequencyIndex + 1]) else {
+            return nil
+        }
+
+        var gain: Float = 0.0
+        if let gainIndex = upperTokens.firstIndex(of: "GAIN"),
+           upperTokens.indices.contains(gainIndex + 1),
+           let parsedGain = parseFloatToken(tokens[gainIndex + 1]) {
+            gain = parsedGain
+        }
+
+        var q: Float = 1.4
+        if let qIndex = upperTokens.firstIndex(of: "Q"),
+           upperTokens.indices.contains(qIndex + 1),
+           let parsedQ = parseFloatToken(tokens[qIndex + 1]) {
+            q = parsedQ
+        }
+
+        let limitedFrequency = min(max(frequency, 20.0), 20_000.0)
+        let limitedGain = type.supportsGain ? min(max(gain, -24.0), 24.0) : 0.0
+        let limitedQ = min(max(q, 0.2), 12.0)
+
+        return EQBand(
+            isEnabled: isEnabled,
+            type: type,
+            frequency: limitedFrequency,
+            gain: limitedGain,
+            q: limitedQ
+        )
+    }
+
+    private func parseFloatToken(_ token: String) -> Float? {
+        let cleaned = token
+            .replacingOccurrences(of: "dB", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "Hz", with: "", options: .caseInsensitive)
+            .trimmingCharacters(in: .whitespaces)
+
+        return Float(cleaned)
+    }
+
+    private func mapFilterType(token: String) -> EQFilterType? {
+        switch token.uppercased() {
+        case "PK", "PEAK":
+            return .peak
+        case "LS", "LSC", "LOWSHELF":
+            return .lowShelf
+        case "HS", "HSC", "HIGHSHELF":
+            return .highShelf
+        case "LP", "LPF", "LOWPASS":
+            return .lowPass
+        case "HP", "HPF", "HIGHPASS":
+            return .highPass
+        case "NO", "NOTCH":
+            return .notch
+        case "BP", "BPF", "BANDPASS":
+            return .bandPass
+        default:
+            return nil
+        }
+    }
+
     private func parseGraphicEQ(_ content: String) throws -> AutoEQCurve {
         // Format: GraphicEQ: 20 -3.5; 22 -3.5; 23 -3.4; ...
         let lines = content.components(separatedBy: .newlines)
@@ -330,7 +466,8 @@ class AutoEQManager: ObservableObject {
 
         return AutoEQCurve(
             bands: interpolateToTargetBands(frequencyGainMap),
-            preGain: preGain
+            preGain: preGain,
+            parametricBands: nil
         )
     }
 
@@ -425,6 +562,21 @@ struct AutoEQHeadphone: Identifiable, Hashable {
         return "https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/\(encodedPath)"
     }
 
+    var parametricEQPath: String {
+        graphicEQPath.replacingOccurrences(of: " GraphicEQ.txt", with: " ParametricEQ.txt")
+    }
+
+    var parametricEQURL: String {
+        let encodedPath = parametricEQPath
+            .split(separator: "/")
+            .map { component in
+                String(component).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String(component)
+            }
+            .joined(separator: "/")
+
+        return "https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/\(encodedPath)"
+    }
+
     var displayType: String {
         switch type {
         case "over-ear": return "Over-ear"
@@ -447,6 +599,7 @@ struct AutoEQHeadphone: Identifiable, Hashable {
 struct AutoEQCurve {
     let bands: [Float]
     let preGain: Float
+    let parametricBands: [EQBand]?
 }
 
 // MARK: - Errors
