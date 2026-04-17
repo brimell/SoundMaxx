@@ -646,7 +646,9 @@ class EQModel: ObservableObject {
             parametricBands = EQBand.tenBand(withGains: savedBands.map { $0.floatValue })
         }
 
-        isEnabled = UserDefaults.standard.object(forKey: legacyEnabledKey) as? Bool ?? true
+        // First launch should always start with processing enabled.
+        isEnabled = true
+        isEQFiltersEnabled = true
         preGain = Self.clampPreGain(UserDefaults.standard.object(forKey: legacyPreGainKey) as? Float ?? 0.0)
         outputGain = 0.0
         limiterEnabled = false
