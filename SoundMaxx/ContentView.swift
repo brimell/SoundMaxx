@@ -159,12 +159,12 @@ struct ContentView: View {
             .help("Choose the output device")
 
             Button {
-                cycleToNextOutputDevice()
+                refreshOutputDevices()
             } label: {
-                Image(systemName: "arrow.triangle.2.circlepath")
+                Image(systemName: "arrow.clockwise")
             }
             .buttonStyle(.borderless)
-            .help("Switch to next output device (Control+Option+Command+O)")
+            .help("Refresh output devices")
         }
     }
 
@@ -351,29 +351,39 @@ struct ContentView: View {
                 }
             }
 
-            ScrollView(.horizontal, showsIndicators: true) {
-                HStack(alignment: .top, spacing: 8) {
-                    ForEach(eqModel.parametricBands.indices, id: \.self) { index in
-                        VStack(spacing: 4) {
-                            EQSliderView(
-                                value: Binding(
-                                    get: { eqModel.parametricBands[index].gain },
-                                    set: { eqModel.setBandGain(index: index, gain: $0) }
-                                ),
-                                label: "",
-                                tooltip: bandTooltip(index)
-                            )
-
-                            if !isCompactLayout {
-                                inlineBandControls(index)
-                            }
-                        }
-                    }
+            if isCompactLayout {
+                eqBandSliderRow
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 2)
+            } else {
+                ScrollView(.horizontal, showsIndicators: true) {
+                    eqBandSliderRow
+                        .padding(.vertical, 2)
                 }
-                .padding(.vertical, 2)
             }
             .opacity(eqModel.isEnabled ? (eqModel.isEQFiltersEnabled ? 1.0 : 0.7) : 0.5)
             .disabled(!eqModel.isEnabled)
+        }
+    }
+
+    private var eqBandSliderRow: some View {
+        HStack(alignment: .top, spacing: 8) {
+            ForEach(eqModel.parametricBands.indices, id: \.self) { index in
+                VStack(spacing: 4) {
+                    EQSliderView(
+                        value: Binding(
+                            get: { eqModel.parametricBands[index].gain },
+                            set: { eqModel.setBandGain(index: index, gain: $0) }
+                        ),
+                        label: "",
+                        tooltip: bandTooltip(index)
+                    )
+
+                    if !isCompactLayout {
+                        inlineBandControls(index)
+                    }
+                }
+            }
         }
     }
 
@@ -870,12 +880,32 @@ struct ContentView: View {
                 .help("Select your speakers or headphones")
 
                 Button {
-                    cycleToNextOutputDevice()
+                    refreshOutputDevices()
                 } label: {
-                    Image(systemName: "arrow.triangle.2.circlepath")
+                    Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(.borderless)
-                .help("Switch to next output device (Control+Option+Command+O)")
+                .help("Refresh output devices")
+            }
+
+            HStack {
+                Text("Shortcut")
+                    .foregroundColor(.secondary)
+                    .frame(width: 50, alignment: .leading)
+
+                Button {
+                    cycleToNextOutputDevice()
+                } label: {
+                    Label("Switch Output", systemImage: "keyboard")
+                }
+                .buttonStyle(.borderless)
+                .help("Switch to next output device")
+
+                Spacer()
+
+                Text("Control+Option+Command+O")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             // Device profile controls
@@ -1176,6 +1206,21 @@ struct ContentView: View {
 
         audioEngine.setOutputDevice(nextDevice.id)
         persistSelectedDevices()
+    }
+
+    private func refreshOutputDevices() {
+        let currentDeviceID = audioEngine.selectedOutputDeviceID
+        deviceManager.refreshDevices()
+
+        guard let currentDeviceID else { return }
+        guard deviceManager.outputDevices.contains(where: { $0.id == currentDeviceID }) else {
+            if let fallbackDeviceID = deviceManager.getDefaultOutputDevice(),
+               deviceManager.outputDevices.contains(where: { $0.id == fallbackDeviceID }) {
+                audioEngine.setOutputDevice(fallbackDeviceID)
+                persistSelectedDevices()
+            }
+            return
+        }
     }
 
     private func importEQFile(_ result: Result<[URL], Error>) {
