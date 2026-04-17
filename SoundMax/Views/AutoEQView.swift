@@ -30,6 +30,9 @@ struct AutoEQView: View {
         .padding()
         .frame(width: 400, height: 450)
         .onAppear {
+            autoEQManager.loadHeadphoneIndexIfNeeded()
+            autoEQManager.search(query: searchText)
+
             // Delay focus to ensure view is ready
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isSearchFocused = true
@@ -68,17 +71,13 @@ struct AutoEQView: View {
                 .onChange(of: searchText) { newValue in
                     // Clear any error when user starts typing
                     autoEQManager.errorMessage = nil
-                    if newValue.isEmpty {
-                        autoEQManager.searchResults = AutoEQManager.popularHeadphones
-                    } else {
-                        autoEQManager.search(query: newValue)
-                    }
+                    autoEQManager.search(query: newValue)
                 }
 
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
-                    autoEQManager.searchResults = AutoEQManager.popularHeadphones
+                    autoEQManager.search(query: "")
                     isSearchFocused = true
                 } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -97,7 +96,7 @@ struct AutoEQView: View {
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text("Fetching EQ data...")
+            Text(selectedHeadphone == nil ? "Loading AutoEQ catalog..." : "Fetching EQ data...")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -125,17 +124,17 @@ struct AutoEQView: View {
     private var headphoneList: some View {
         ScrollView {
             LazyVStack(spacing: 2) {
-                let headphones = searchText.isEmpty ? AutoEQManager.popularHeadphones : autoEQManager.searchResults
+                let headphones = autoEQManager.searchResults
 
                 if headphones.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "magnifyingglass")
                             .font(.title)
                             .foregroundColor(.secondary)
-                        Text("No headphones found")
+                        Text(searchText.isEmpty ? "No AutoEQ headphones available" : "No headphones found")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Text("Try a different search term")
+                        Text(searchText.isEmpty ? "Check your network connection and try again" : "Try a different search term")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -169,7 +168,7 @@ struct AutoEQView: View {
                         Text("•")
                             .font(.system(size: 10))
                             .foregroundColor(.secondary.opacity(0.5))
-                        Text(headphone.source)
+                        Text(headphone.sourceDisplayName)
                             .font(.system(size: 10))
                             .foregroundColor(.orange.opacity(0.8))
                     }
