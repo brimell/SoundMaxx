@@ -49,9 +49,7 @@ struct ContentView: View {
 
             Divider()
 
-            if !isCompactLayout {
-                responseGraph
-            }
+            responseGraph
 
             eqSliders
 
