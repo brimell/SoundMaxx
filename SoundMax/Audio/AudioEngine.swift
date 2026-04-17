@@ -60,6 +60,8 @@ class AudioEngine: ObservableObject {
     }
 
     func setInputDevice(_ deviceID: AudioDeviceID) {
+        // Ignore no-op selections so menu/view reappears do not restart audio.
+        guard selectedInputDeviceID != deviceID else { return }
         selectedInputDeviceID = deviceID
         if isRunning {
             stop()
@@ -68,6 +70,8 @@ class AudioEngine: ObservableObject {
     }
 
     func setOutputDevice(_ deviceID: AudioDeviceID) {
+        // Ignore no-op selections so menu/view reappears do not restart audio.
+        guard selectedOutputDeviceID != deviceID else { return }
         selectedOutputDeviceID = deviceID
 
         // Get device info
