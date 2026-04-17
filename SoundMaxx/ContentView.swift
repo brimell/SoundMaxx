@@ -336,8 +336,36 @@ struct ContentView: View {
             .toggleStyle(.button)
             .controlSize(.small)
             .help("When enabled, clipping is detected on output and pre-gain is automatically reduced to prevent clipping.")
+
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(audioEngine.clippingDetected ? Color.red : Color.secondary.opacity(0.28))
+                    .frame(width: 8, height: 8)
+
+                Text(audioEngine.clippingDetected ? "CLIPPING" : "No clipping")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(audioEngine.clippingDetected ? .red : .secondary)
+
+                Spacer()
+
+                Text(peakLabel)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(.secondary)
+            }
+            .help("Lights red when output exceeds 0 dBFS. The indicator holds briefly so short clips are visible.")
         }
         .opacity(eqModel.isEnabled ? 1.0 : 0.5)
+    }
+
+    private var peakLabel: String {
+        let peak = audioEngine.outputPeakSample
+        guard peak > 0 else { return "Peak -inf dBFS" }
+
+        let dBFS = 20.0 * log10(Double(peak))
+        if dBFS >= 0 {
+            return String(format: "Peak +%.1f dBFS", dBFS)
+        }
+        return String(format: "Peak %.1f dBFS", dBFS)
     }
 
     private var presetControls: some View {

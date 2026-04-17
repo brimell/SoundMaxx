@@ -26,11 +26,19 @@ class AudioEngine: ObservableObject {
     @Published var softwareVolume: Float = 1.0
     @Published var preGain: Float = 0.0
     @Published var autoStopClippingEnabled: Bool = false
+    @Published private(set) var outputPeakSample: Float = 0.0
+    @Published private(set) var clippingDetected: Bool = false
 
     private var autoStopClippingRuntimeEnabled = false
     private var lastAutoPreGainAdjustmentTime: TimeInterval = 0
     private let autoPreGainAdjustmentInterval: TimeInterval = 0.25
     private let autoPreGainHeadroomDB: Float = 0.2
+    private let clippingIndicatorHoldDuration: TimeInterval = 1.0
+    private let meterPublishInterval: TimeInterval = 1.0 / 20.0
+    private var clippingHoldUntilTime: TimeInterval = 0
+    private var lastMeterPublishTime: TimeInterval = 0
+    private var lastMeterPeakSample: Float = 0.0
+    private var lastMeterClippingDetected = false
 
     // Device info
     @Published var outputDeviceNeedsVolumeControl = false
@@ -189,6 +197,7 @@ class AudioEngine: ObservableObject {
             // Initialize ring buffer
             ringBuffer = RingBuffer(channels: 2, bytesPerFrame: 8, capacityFrames: bufferSize * 4)
             prepareInputRenderBuffers(frameCapacity: bufferSize)
+            resetClippingMeterState()
 
             // Create input unit (captures from BlackHole)
             inputUnit = try createInputUnit(deviceID: inputDeviceID, format: &streamFormat)
@@ -489,6 +498,7 @@ class AudioEngine: ObservableObject {
         parametricEQ = nil
         ringBuffer = nil
         releaseInputRenderBuffers()
+        resetClippingMeterState()
     }
 
     // Called when input data is available from BlackHole
@@ -553,31 +563,29 @@ class AudioEngine: ObservableObject {
             }
         }
 
-        // Apply software volume and optionally detect clipping.
+        // Apply software volume and capture peak level for clipping indication.
         let autoStopEnabled = autoStopClippingRuntimeEnabled
         let volume = softwareVolume
-        if volume < 1.0 || autoStopEnabled {
-            var peakSample: Float = 0.0
-            let bufferListPtr = UnsafeMutableAudioBufferListPointer(ioData)
-            for buffer in bufferListPtr {
-                guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
-                for i in 0..<Int(inNumberFrames) {
-                    if volume < 1.0 {
-                        data[i] *= volume
-                    }
+        var peakSample: Float = 0.0
+        let bufferListPtr = UnsafeMutableAudioBufferListPointer(ioData)
+        for buffer in bufferListPtr {
+            guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
+            for i in 0..<Int(inNumberFrames) {
+                if volume < 1.0 {
+                    data[i] *= volume
+                }
 
-                    if autoStopEnabled {
-                        let absSample = fabsf(data[i])
-                        if absSample > peakSample {
-                            peakSample = absSample
-                        }
-                    }
+                let absSample = fabsf(data[i])
+                if absSample > peakSample {
+                    peakSample = absSample
                 }
             }
+        }
 
-            if autoStopEnabled {
-                reducePreGainIfClipping(peakSample)
-            }
+        publishOutputPeak(peakSample)
+
+        if autoStopEnabled {
+            reducePreGainIfClipping(peakSample)
         }
 
         return noErr
@@ -603,6 +611,43 @@ class AudioEngine: ObservableObject {
             guard let self else { return }
             self.preGain = newPreGain
             self.onPreGainAutoAdjusted?(newPreGain)
+        }
+    }
+
+    private func publishOutputPeak(_ peakSample: Float) {
+        let now = Date().timeIntervalSinceReferenceDate
+        if peakSample > 1.0 {
+            clippingHoldUntilTime = now + clippingIndicatorHoldDuration
+        }
+
+        let clippingActive = now <= clippingHoldUntilTime
+        let clippingStateChanged = clippingActive != lastMeterClippingDetected
+        let peakChangedEnough = fabsf(peakSample - lastMeterPeakSample) >= 0.01
+        let publishDue = (now - lastMeterPublishTime) >= meterPublishInterval
+
+        guard clippingStateChanged || peakChangedEnough || publishDue else { return }
+
+        lastMeterPublishTime = now
+        lastMeterPeakSample = peakSample
+        lastMeterClippingDetected = clippingActive
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.outputPeakSample = peakSample
+            self.clippingDetected = clippingActive
+        }
+    }
+
+    private func resetClippingMeterState() {
+        clippingHoldUntilTime = 0
+        lastMeterPublishTime = 0
+        lastMeterPeakSample = 0
+        lastMeterClippingDetected = false
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.outputPeakSample = 0
+            self.clippingDetected = false
         }
     }
 }
