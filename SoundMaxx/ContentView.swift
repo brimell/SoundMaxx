@@ -331,22 +331,24 @@ struct ContentView: View {
 
                 Spacer()
 
-                Button {
-                    eqModel.removeLastBand()
-                } label: {
-                    Image(systemName: "minus")
-                }
-                .buttonStyle(.borderless)
-                .disabled(eqModel.parametricBands.count <= EQModel.minimumBandCount)
-                .help("Remove last band")
+                if !isCompactLayout {
+                    Button {
+                        eqModel.removeLastBand()
+                    } label: {
+                        Image(systemName: "minus")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(eqModel.parametricBands.count <= EQModel.minimumBandCount)
+                    .help("Remove last band")
 
-                Button {
-                    eqModel.addBand()
-                } label: {
-                    Image(systemName: "plus")
+                    Button {
+                        eqModel.addBand()
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Add a new band")
                 }
-                .buttonStyle(.borderless)
-                .help("Add a new band")
             }
 
             ScrollView(.horizontal, showsIndicators: true) {
