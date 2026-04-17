@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+DEFAULT_ENV_FILE="$PROJECT_DIR/.env"
+ENV_FILE="${PUBLISH_ENV_FILE:-$DEFAULT_ENV_FILE}"
+
 usage() {
     cat <<'EOF'
 Usage: ./scripts/publish-release.sh [options]
@@ -15,12 +20,18 @@ Options:
   --tag <tag>          Release tag (default: v<CFBundleShortVersionString>)
   --title <title>      Release title (default: SoundMaxx <tag> [build n])
   --notes <text>       Release notes text for newly created releases
-  --repo <owner/repo>  GitHub repository slug (default: autodetect)
+    --repo <owner/repo>  GitHub repository slug (default: autodetect)
+    --env-file <path>    Load release settings from this .env file (default: ./.env)
   --prerelease         Mark newly created release as prerelease
   -h, --help           Show this help message
 
 Environment alternatives:
-  GITHUB_REPOSITORY, RELEASE_TAG, RELEASE_TITLE, RELEASE_NOTES, ASSET_PATH
+    GITHUB_REPOSITORY, RELEASE_REPO, RELEASE_TAG, RELEASE_TITLE, RELEASE_NOTES,
+    RELEASE_NOTES_FILE, ASSET_PATH, RELEASE_ASSET_PATH, RELEASE_SKIP_BUILD,
+    RELEASE_PRERELEASE, PUBLISH_ENV_FILE
+
+Authentication:
+    gh auth login OR set GH_TOKEN/GITHUB_TOKEN in your environment/.env
 EOF
 }
 
@@ -32,13 +43,69 @@ require_command() {
     fi
 }
 
+load_env_file() {
+    local env_file="$1"
+
+    if [[ ! -f "$env_file" ]]; then
+        return 0
+    fi
+
+    set -a
+    # shellcheck disable=SC1090
+    source "$env_file"
+    set +a
+}
+
+is_truthy() {
+    local value
+    local normalized
+    value="${1:-}"
+    normalized="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+
+    case "$normalized" in
+        1|true|yes|y|on)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+ARGS=("$@")
+i=0
+while [[ $i -lt ${#ARGS[@]} ]]; do
+    case "${ARGS[$i]}" in
+        --env-file)
+            i=$((i + 1))
+            if [[ $i -ge ${#ARGS[@]} ]]; then
+                echo "Error: --env-file requires a value." >&2
+                exit 1
+            fi
+            ENV_FILE="${ARGS[$i]}"
+            ;;
+    esac
+    i=$((i + 1))
+done
+
+load_env_file "$ENV_FILE"
+
 SKIP_BUILD=0
 IS_PRERELEASE=0
-ASSET_PATH="${ASSET_PATH:-}"
+ASSET_PATH="${ASSET_PATH:-${RELEASE_ASSET_PATH:-}}"
 RELEASE_TAG="${RELEASE_TAG:-}"
 RELEASE_TITLE="${RELEASE_TITLE:-}"
 RELEASE_NOTES="${RELEASE_NOTES:-}"
-REPO="${GITHUB_REPOSITORY:-}"
+RELEASE_NOTES_FILE="${RELEASE_NOTES_FILE:-}"
+REPO="${GITHUB_REPOSITORY:-${RELEASE_REPO:-}}"
+
+if is_truthy "${RELEASE_SKIP_BUILD:-0}"; then
+    SKIP_BUILD=1
+fi
+
+if is_truthy "${RELEASE_PRERELEASE:-0}"; then
+    IS_PRERELEASE=1
+fi
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -66,6 +133,10 @@ while [[ $# -gt 0 ]]; do
             REPO="$2"
             shift 2
             ;;
+        --env-file)
+            ENV_FILE="$2"
+            shift 2
+            ;;
         --prerelease)
             IS_PRERELEASE=1
             shift
@@ -85,13 +156,11 @@ done
 require_command gh
 require_command /usr/libexec/PlistBuddy
 
-if ! gh auth status >/dev/null 2>&1; then
+if ! gh auth status >/dev/null 2>&1 && [[ -z "${GH_TOKEN:-}" && -z "${GITHUB_TOKEN:-}" ]]; then
     echo "Error: GitHub CLI is not authenticated. Run: gh auth login" >&2
     exit 1
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_SCRIPT="$SCRIPT_DIR/build-release.sh"
 BUILD_DIR="$PROJECT_DIR/build"
 INFO_PLIST="$PROJECT_DIR/SoundMaxx/Info.plist"
@@ -122,6 +191,14 @@ fi
 
 if [[ -z "$RELEASE_NOTES" ]]; then
     RELEASE_NOTES="Automated release for ${RELEASE_TAG}."
+fi
+
+if [[ -n "$RELEASE_NOTES_FILE" ]]; then
+    if [[ ! -f "$RELEASE_NOTES_FILE" ]]; then
+        echo "Error: RELEASE_NOTES_FILE does not exist: $RELEASE_NOTES_FILE" >&2
+        exit 1
+    fi
+    RELEASE_NOTES="$(<"$RELEASE_NOTES_FILE")"
 fi
 
 if [[ "$SKIP_BUILD" -eq 0 ]]; then
