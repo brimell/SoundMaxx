@@ -293,22 +293,21 @@ struct ContentView: View {
             Divider()
 
             Group {
-                helpRow(icon: "slider.vertical.3", title: "EQ Sliders", desc: "Drag up to boost, down to cut (±12dB)")
-                helpRow(icon: "arrow.up.and.down.circle", title: "Headroom + Volume", desc: "Headroom protects the EQ stage, Volume is post-EQ loudness")
-                helpRow(icon: "arrow.left.arrow.right.square", title: "EQ Switch", desc: "Toggle filters on/off for A/B comparison while keeping headroom")
-                helpRow(icon: "waveform.path.ecg", title: "Output Safety", desc: "Separate EQ clipping, limiter activity, and final output status")
-                helpRow(icon: "speaker.wave.2", title: "Volume", desc: "Software volume for HDMI outputs, with optional separate volume per output device")
-                helpRow(icon: "square.and.arrow.down", title: "Presets", desc: "Select or save EQ configurations")
-                helpRow(icon: "headphones", title: "AutoEQ", desc: "Apply headphone correction curves")
-                helpRow(icon: "hifispeaker", title: "Device Profiles", desc: "EQ settings saved per output device")
-                helpRow(icon: "keyboard", title: "Output Shortcut", desc: "Control+Option+Command+O switches between selected outputs")
-                helpRow(icon: "power", title: "Start/Stop", desc: "Toggle audio processing")
+                helpRow(icon: "slider.vertical.3", title: "EQ Sliders", desc: "Drag each band up/down to shape tone (±12 dB).")
+                helpRow(icon: "arrow.up.and.down.circle", title: "Gain Staging", desc: "Headroom is pre-EQ safety (-12 to 0 dB). Volume is post-EQ loudness (-40 to +40 dB).")
+                helpRow(icon: "power", title: "Audio + EQ Toggles", desc: "Audio bypasses the full chain. EQ bypasses filters only for quick A/B checks.")
+                helpRow(icon: "waveform.path.ecg", title: "Clipping + Limiter", desc: "Watch EQ-stage clipping, limiter activity, and final output status.")
+                helpRow(icon: "speaker.wave.2", title: "HDMI Volume", desc: "Software volume appears for outputs without hardware volume control.")
+                helpRow(icon: "square.and.arrow.down", title: "Presets + Import", desc: "Use built-in/custom presets, or import AutoEQ ParametricEQ.txt / GraphicEQ.txt files.")
+                helpRow(icon: "headphones", title: "AutoEQ", desc: "Search and apply headphone correction curves from AutoEQ.")
+                helpRow(icon: "hifispeaker", title: "Device Profiles", desc: "Save EQ per output device. Profiles auto-restore and can auto-save tweaks.")
+                helpRow(icon: "keyboard", title: "Output Shortcut", desc: "Control+Option+Command+O cycles selected shortcut targets.")
             }
 
             Divider()
 
             HStack {
-                Text("Tip: Set system output to BlackHole 2ch")
+                Text("Tip: Set macOS output to BlackHole 2ch, then choose your real output in SoundMaxx.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
