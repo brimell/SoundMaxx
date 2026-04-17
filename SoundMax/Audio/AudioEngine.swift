@@ -6,6 +6,9 @@ class AudioEngine: ObservableObject {
     private var inputUnit: AudioUnit?
     private var outputUnit: AudioUnit?
     private var parametricEQ: ParametricEQ?
+    private var inputRenderBufferList: UnsafeMutableAudioBufferListPointer?
+    private var inputRenderChannelData: [UnsafeMutablePointer<Float>] = []
+    private var inputRenderFrameCapacity: UInt32 = 0
 
     private var ringBuffer: RingBuffer?
     private let bufferSize: UInt32 = 4096
@@ -19,6 +22,7 @@ class AudioEngine: ObservableObject {
 
     // Software volume control (0.0 to 1.0)
     @Published var softwareVolume: Float = 1.0
+    @Published var preGain: Float = 0.0
 
     // Device info
     @Published var outputDeviceNeedsVolumeControl = false
@@ -34,6 +38,11 @@ class AudioEngine: ObservableObject {
 
     func setVolume(_ volume: Float) {
         softwareVolume = max(0.0, min(1.0, volume))
+    }
+
+    func setPreGain(_ gain: Float) {
+        preGain = max(-24.0, min(24.0, gain))
+        parametricEQ?.setPreGain(preGain)
     }
 
     func setGain(forBand band: Int, gain: Float) {
@@ -163,6 +172,7 @@ class AudioEngine: ObservableObject {
 
             // Initialize ring buffer
             ringBuffer = RingBuffer(channels: 2, bytesPerFrame: 8, capacityFrames: bufferSize * 4)
+            prepareInputRenderBuffers(frameCapacity: bufferSize)
 
             // Create input unit (captures from BlackHole)
             inputUnit = try createInputUnit(deviceID: inputDeviceID, format: &streamFormat)
@@ -173,6 +183,7 @@ class AudioEngine: ObservableObject {
             // Create parametric EQ
             parametricEQ = ParametricEQ(sampleRate: workingSampleRate, bands: currentBands)
             parametricEQ?.bypass = currentBypassState
+            parametricEQ?.setPreGain(preGain)
 
             // Start units
             var status = AudioOutputUnitStart(inputUnit!)
@@ -222,10 +233,18 @@ class AudioEngine: ObservableObject {
         var enableIO: UInt32 = 1
         status = AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_EnableIO,
                                       kAudioUnitScope_Input, 1, &enableIO, UInt32(MemoryLayout<UInt32>.size))
+        guard status == noErr else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status),
+                          userInfo: [NSLocalizedDescriptionKey: "Could not enable input on input unit"])
+        }
 
         enableIO = 0
         status = AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_EnableIO,
                                       kAudioUnitScope_Output, 0, &enableIO, UInt32(MemoryLayout<UInt32>.size))
+        guard status == noErr else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status),
+                          userInfo: [NSLocalizedDescriptionKey: "Could not disable output on input unit"])
+        }
 
         // Set device
         var deviceIDVar = deviceID
@@ -239,6 +258,10 @@ class AudioEngine: ObservableObject {
         // Set format
         status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_StreamFormat,
                                       kAudioUnitScope_Output, 1, &format, UInt32(MemoryLayout<AudioStreamBasicDescription>.size))
+        guard status == noErr else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status),
+                          userInfo: [NSLocalizedDescriptionKey: "Could not set stream format for input unit"])
+        }
 
         // Set input callback
         var callbackStruct = AURenderCallbackStruct(
@@ -247,6 +270,10 @@ class AudioEngine: ObservableObject {
         )
         status = AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_SetInputCallback,
                                       kAudioUnitScope_Global, 0, &callbackStruct, UInt32(MemoryLayout<AURenderCallbackStruct>.size))
+        guard status == noErr else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status),
+                          userInfo: [NSLocalizedDescriptionKey: "Could not set input callback"])
+        }
 
         status = AudioUnitInitialize(audioUnit)
         guard status == noErr else {
@@ -290,6 +317,10 @@ class AudioEngine: ObservableObject {
         // Set format
         status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_StreamFormat,
                                       kAudioUnitScope_Input, 0, &format, UInt32(MemoryLayout<AudioStreamBasicDescription>.size))
+        guard status == noErr else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status),
+                          userInfo: [NSLocalizedDescriptionKey: "Could not set stream format for output unit"])
+        }
 
         // Set render callback
         var callbackStruct = AURenderCallbackStruct(
@@ -298,6 +329,10 @@ class AudioEngine: ObservableObject {
         )
         status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_SetRenderCallback,
                                       kAudioUnitScope_Input, 0, &callbackStruct, UInt32(MemoryLayout<AURenderCallbackStruct>.size))
+        guard status == noErr else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status),
+                          userInfo: [NSLocalizedDescriptionKey: "Could not set output callback"])
+        }
 
         status = AudioUnitInitialize(audioUnit)
         guard status == noErr else {
@@ -328,6 +363,14 @@ class AudioEngine: ObservableObject {
     }
 
     private func setDeviceSampleRate(_ deviceID: AudioDeviceID, sampleRate: Double) -> Bool {
+        if let currentRate = try? getDeviceSampleRate(deviceID), abs(currentRate - sampleRate) < 0.1 {
+            return true
+        }
+
+        guard deviceSupportsSampleRate(deviceID, sampleRate: sampleRate) else {
+            return false
+        }
+
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyNominalSampleRate,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -354,6 +397,63 @@ class AudioEngine: ObservableObject {
         return status == noErr
     }
 
+    private func deviceSupportsSampleRate(_ deviceID: AudioDeviceID, sampleRate: Double) -> Bool {
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyAvailableNominalSampleRates,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var dataSize: UInt32 = 0
+        var status = AudioObjectGetPropertyDataSize(deviceID, &propertyAddress, 0, nil, &dataSize)
+        guard status == noErr else { return true }
+
+        let count = Int(dataSize) / MemoryLayout<AudioValueRange>.size
+        guard count > 0 else { return true }
+
+        var ranges = [AudioValueRange](repeating: AudioValueRange(mMinimum: 0, mMaximum: 0), count: count)
+        status = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, &dataSize, &ranges)
+        guard status == noErr else { return true }
+
+        return ranges.contains { range in
+            sampleRate >= range.mMinimum && sampleRate <= range.mMaximum
+        }
+    }
+
+    private func prepareInputRenderBuffers(frameCapacity: UInt32) {
+        releaseInputRenderBuffers()
+
+        var bufferList = AudioBufferList.allocate(maximumBuffers: 2)
+        inputRenderFrameCapacity = frameCapacity
+
+        for i in 0..<2 {
+            let channelData = UnsafeMutablePointer<Float>.allocate(capacity: Int(frameCapacity))
+            channelData.initialize(repeating: 0, count: Int(frameCapacity))
+            inputRenderChannelData.append(channelData)
+
+            bufferList[i].mNumberChannels = 1
+            bufferList[i].mDataByteSize = frameCapacity * UInt32(MemoryLayout<Float>.size)
+            bufferList[i].mData = UnsafeMutableRawPointer(channelData)
+        }
+
+        inputRenderBufferList = bufferList
+    }
+
+    private func releaseInputRenderBuffers() {
+        for channelData in inputRenderChannelData {
+            channelData.deinitialize(count: Int(inputRenderFrameCapacity))
+            channelData.deallocate()
+        }
+        inputRenderChannelData.removeAll(keepingCapacity: false)
+
+        if let bufferList = inputRenderBufferList {
+            bufferList.unsafeMutablePointer.deallocate()
+            inputRenderBufferList = nil
+        }
+
+        inputRenderFrameCapacity = 0
+    }
+
     func stop() {
         cleanup()
         isRunning = false
@@ -372,6 +472,7 @@ class AudioEngine: ObservableObject {
         }
         parametricEQ = nil
         ringBuffer = nil
+        releaseInputRenderBuffers()
     }
 
     // Called when input data is available from BlackHole
@@ -384,13 +485,11 @@ class AudioEngine: ObservableObject {
         ioData: UnsafeMutablePointer<AudioBufferList>?
     ) -> OSStatus {
         guard let inputUnit = inputUnit, let ringBuffer = ringBuffer else { return noErr }
+        guard let bufferList = inputRenderBufferList else { return noErr }
+        guard inNumberFrames <= inputRenderFrameCapacity else { return noErr }
 
-        // Allocate buffer for input - 2 separate buffers for non-interleaved stereo
-        let bufferList = AudioBufferList.allocate(maximumBuffers: 2)
         for i in 0..<2 {
-            bufferList[i].mNumberChannels = 1
-            bufferList[i].mDataByteSize = inNumberFrames * 4
-            bufferList[i].mData = malloc(Int(inNumberFrames * 4))
+            bufferList[i].mDataByteSize = inNumberFrames * UInt32(MemoryLayout<Float>.size)
         }
 
         // Render input
@@ -398,11 +497,6 @@ class AudioEngine: ObservableObject {
 
         if status == noErr {
             ringBuffer.store(bufferList.unsafeMutablePointer, frameCount: inNumberFrames)
-        }
-
-        // Free buffers
-        for i in 0..<2 {
-            free(bufferList[i].mData)
         }
 
         return status
