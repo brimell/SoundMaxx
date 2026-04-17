@@ -65,6 +65,9 @@ struct ContentView: View {
         .onChange(of: eqModel.isEnabled) { newValue in
             audioEngine.setBypass(!newValue)
         }
+        .onChange(of: eqModel.isEQFiltersEnabled) { newValue in
+            audioEngine.setEQFiltersEnabled(newValue)
+        }
         .onChange(of: eqModel.preGain) { newValue in
             audioEngine.setPreGain(newValue)
         }
@@ -85,6 +88,7 @@ struct ContentView: View {
                 eqModel.onDeviceChanged(deviceUID: uid, deviceName: name)
                 audioEngine.setBands(eqModel.parametricBands)
                 audioEngine.setBypass(!eqModel.isEnabled)
+                audioEngine.setEQFiltersEnabled(eqModel.isEQFiltersEnabled)
                 // Sync volume from profile to engine
                 audioEngine.setPreGain(eqModel.preGain)
                 audioEngine.setAutoStopClippingEnabled(eqModel.autoStopClippingEnabled)
@@ -120,9 +124,26 @@ struct ContentView: View {
                 helpView
             }
 
-            Toggle("", isOn: $eqModel.isEnabled)
-                .toggleStyle(.switch)
-                .labelsHidden()
+            HStack(spacing: 8) {
+                Text("Audio")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Toggle("", isOn: $eqModel.isEnabled)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .help("Enable or bypass all processing (pre-gain + EQ filters)")
+
+                Text("EQ")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Toggle("", isOn: $eqModel.isEQFiltersEnabled)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .disabled(!eqModel.isEnabled)
+                    .help("Bypass only EQ filters while keeping pre-gain active for A/B comparison")
+            }
         }
     }
 
@@ -136,6 +157,7 @@ struct ContentView: View {
             Group {
                 helpRow(icon: "slider.vertical.3", title: "EQ Sliders", desc: "Drag up to boost, down to cut (±12dB)")
                 helpRow(icon: "arrow.up.and.down.circle", title: "Pre-Gain", desc: "Adjust overall EQ input level before filters")
+                helpRow(icon: "arrow.left.arrow.right.square", title: "EQ Switch", desc: "Toggle filters on/off for A/B comparison while keeping pre-gain")
                 helpRow(icon: "waveform.path.ecg", title: "auto-stop clipping", desc: "Automatically lowers pre-gain if output starts clipping")
                 helpRow(icon: "speaker.wave.2", title: "Volume", desc: "Software volume for HDMI outputs")
                 helpRow(icon: "square.and.arrow.down", title: "Presets", desc: "Select or save EQ configurations")
@@ -192,7 +214,7 @@ struct ContentView: View {
     private var responseGraph: some View {
         EQResponseGraphView(
             points: responseCurvePoints,
-            isEnabled: eqModel.isEnabled,
+            isEnabled: eqModel.isEnabled && eqModel.isEQFiltersEnabled,
             sampleRate: audioEngine.processingSampleRate
         )
         .frame(height: 154)
@@ -216,7 +238,7 @@ struct ContentView: View {
                 }
             }
         }
-        .opacity(eqModel.isEnabled ? 1.0 : 0.5)
+        .opacity(eqModel.isEnabled ? (eqModel.isEQFiltersEnabled ? 1.0 : 0.7) : 0.5)
         .disabled(!eqModel.isEnabled)
     }
 
@@ -642,6 +664,7 @@ struct ContentView: View {
     private func syncEQToEngine() {
         audioEngine.setBands(eqModel.parametricBands)
         audioEngine.setBypass(!eqModel.isEnabled)
+        audioEngine.setEQFiltersEnabled(eqModel.isEQFiltersEnabled)
         audioEngine.setPreGain(eqModel.preGain)
         audioEngine.setAutoStopClippingEnabled(eqModel.autoStopClippingEnabled)
         audioEngine.setVolume(eqModel.volume)

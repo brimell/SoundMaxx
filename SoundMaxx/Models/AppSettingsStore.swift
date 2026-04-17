@@ -5,6 +5,7 @@ import Foundation
 struct AppSettings: Codable {
     var parametricBands: [EQBand] = EQBand.defaultTenBand
     var isEnabled: Bool = true
+    var isEQFiltersEnabled: Bool = true
     var preGain: Float = 0.0
     var autoStopClippingEnabled: Bool = false
     var volume: Float = 1.0
@@ -17,6 +18,7 @@ struct AppSettings: Codable {
     enum CodingKeys: String, CodingKey {
         case parametricBands
         case isEnabled
+        case isEQFiltersEnabled
         case preGain
         case autoStopClippingEnabled
         case volume
@@ -34,6 +36,7 @@ struct AppSettings: Codable {
 
         parametricBands = try container.decodeIfPresent([EQBand].self, forKey: .parametricBands) ?? EQBand.defaultTenBand
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+    isEQFiltersEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEQFiltersEnabled) ?? true
         preGain = try container.decodeIfPresent(Float.self, forKey: .preGain) ?? 0.0
         autoStopClippingEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoStopClippingEnabled) ?? false
         volume = try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0
@@ -49,6 +52,7 @@ struct AppSettings: Codable {
 
         try container.encode(parametricBands, forKey: .parametricBands)
         try container.encode(isEnabled, forKey: .isEnabled)
+    try container.encode(isEQFiltersEnabled, forKey: .isEQFiltersEnabled)
         try container.encode(preGain, forKey: .preGain)
         try container.encode(autoStopClippingEnabled, forKey: .autoStopClippingEnabled)
         try container.encode(volume, forKey: .volume)

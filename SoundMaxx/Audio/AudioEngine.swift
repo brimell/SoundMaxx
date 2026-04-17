@@ -15,6 +15,7 @@ class AudioEngine: ObservableObject {
     private let bufferSize: UInt32 = 4096
     private var currentBands: [EQBand] = EQBand.defaultTenBand
     private var currentBypassState = false
+    private var currentEQFiltersEnabled = true
 
     @Published var isRunning = false
     @Published var selectedInputDeviceID: AudioDeviceID?
@@ -88,6 +89,11 @@ class AudioEngine: ObservableObject {
     func setBypass(_ bypass: Bool) {
         currentBypassState = bypass
         parametricEQ?.bypass = bypass
+    }
+
+    func setEQFiltersEnabled(_ enabled: Bool) {
+        currentEQFiltersEnabled = enabled
+        parametricEQ?.setFiltersEnabled(enabled)
     }
 
     func setInputDevice(_ deviceID: AudioDeviceID) {
@@ -208,6 +214,7 @@ class AudioEngine: ObservableObject {
             // Create parametric EQ
             parametricEQ = ParametricEQ(sampleRate: workingSampleRate, bands: currentBands)
             parametricEQ?.bypass = currentBypassState
+            parametricEQ?.setFiltersEnabled(currentEQFiltersEnabled)
             parametricEQ?.setPreGain(preGain)
 
             // Start units

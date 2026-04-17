@@ -4,6 +4,7 @@ import Combine
 class EQModel: ObservableObject {
     @Published var parametricBands: [EQBand] = EQBand.defaultTenBand
     @Published var isEnabled: Bool = true
+    @Published var isEQFiltersEnabled: Bool = true
     @Published var preGain: Float = 0.0
     @Published var autoStopClippingEnabled: Bool = false
     @Published var volume: Float = 1.0
@@ -45,6 +46,13 @@ class EQModel: ObservableObject {
             .store(in: &cancellables)
 
         $isEnabled
+            .sink { [weak self] _ in
+                self?.saveSettings()
+                self?.autoSaveToDeviceProfile()
+            }
+            .store(in: &cancellables)
+
+        $isEQFiltersEnabled
             .sink { [weak self] _ in
                 self?.saveSettings()
                 self?.autoSaveToDeviceProfile()
@@ -102,7 +110,8 @@ class EQModel: ObservableObject {
             preGain: preGain,
             autoStopClippingEnabled: autoStopClippingEnabled,
             volume: volume,
-            isEQEnabled: isEnabled
+            isEQEnabled: isEnabled,
+            isEQFiltersEnabled: isEQFiltersEnabled
         )
         hasDeviceProfile = true
     }
@@ -120,6 +129,7 @@ class EQModel: ObservableObject {
         autoStopClippingEnabled = profile.autoStopClippingEnabled
         volume = profile.volume
         isEnabled = profile.isEQEnabled
+        isEQFiltersEnabled = profile.isEQFiltersEnabled
         clearPresetSelection()
         isLoadingProfile = false
     }
@@ -140,7 +150,8 @@ class EQModel: ObservableObject {
             preGain: preGain,
             autoStopClippingEnabled: autoStopClippingEnabled,
             volume: volume,
-            isEQEnabled: isEnabled
+            isEQEnabled: isEnabled,
+            isEQFiltersEnabled: isEQFiltersEnabled
         )
     }
 
@@ -216,6 +227,7 @@ class EQModel: ObservableObject {
         settingsStore.update { settings in
             settings.parametricBands = parametricBands
             settings.isEnabled = isEnabled
+            settings.isEQFiltersEnabled = isEQFiltersEnabled
             settings.preGain = preGain
             settings.autoStopClippingEnabled = autoStopClippingEnabled
             settings.volume = volume
@@ -240,6 +252,7 @@ class EQModel: ObservableObject {
                 parametricBands = settings.parametricBands
             }
             isEnabled = settings.isEnabled
+            isEQFiltersEnabled = settings.isEQFiltersEnabled
             preGain = settings.preGain
             autoStopClippingEnabled = settings.autoStopClippingEnabled
             volume = settings.volume
@@ -307,8 +320,10 @@ extension EQModel {
         guard isEnabled else { return 0.0 }
 
         var totalMagnitude = powf(10.0, preGain / 20.0)
-        for band in parametricBands where band.isEnabled {
-            totalMagnitude *= Self.biquadMagnitude(for: band, at: frequency, sampleRate: sampleRate)
+        if isEQFiltersEnabled {
+            for band in parametricBands where band.isEnabled {
+                totalMagnitude *= Self.biquadMagnitude(for: band, at: frequency, sampleRate: sampleRate)
+            }
         }
 
         let safeMagnitude = max(totalMagnitude, 1e-7)

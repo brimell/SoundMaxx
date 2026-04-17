@@ -180,6 +180,8 @@ class ParametricEQ {
     private var filters: [BiquadFilter] = []
     private var activeBands: [EQBand] = []
     private var pendingBands: [EQBand]?
+    private var filtersEnabled = true
+    private var pendingFiltersEnabled: Bool?
     private var preGainDB: Float = 0.0
     private var preGainLinear: Float = 1.0
     private var pendingPreGainDB: Float?
@@ -219,6 +221,12 @@ class ParametricEQ {
         updateLock.unlock()
     }
 
+    func setFiltersEnabled(_ enabled: Bool) {
+        updateLock.lock()
+        pendingFiltersEnabled = enabled
+        updateLock.unlock()
+    }
+
     /// Process audio buffer in place
     func process(buffer: UnsafeMutablePointer<Float>, frameCount: Int, channel: Int) {
         guard !bypass else { return }
@@ -228,9 +236,11 @@ class ParametricEQ {
         for frame in 0..<frameCount {
             var sample = buffer[frame] * preGainLinear
 
-            // Apply each enabled filter in series.
-            for (filter, band) in zip(filters, activeBands) where band.isEnabled {
-                sample = filter.process(sample: sample, channel: channel)
+            if filtersEnabled {
+                // Apply each enabled filter in series.
+                for (filter, band) in zip(filters, activeBands) where band.isEnabled {
+                    sample = filter.process(sample: sample, channel: channel)
+                }
             }
 
             buffer[frame] = sample
@@ -246,10 +256,16 @@ class ParametricEQ {
     private func applyPendingUpdatesIfNeeded() {
         updateLock.lock()
         let nextBands = pendingBands
+        let nextFiltersEnabled = pendingFiltersEnabled
         let nextPreGainDB = pendingPreGainDB
         pendingBands = nil
+        pendingFiltersEnabled = nil
         pendingPreGainDB = nil
         updateLock.unlock()
+
+        if let nextFiltersEnabled {
+            filtersEnabled = nextFiltersEnabled
+        }
 
         if let nextPreGainDB {
             preGainDB = nextPreGainDB

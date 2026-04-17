@@ -13,6 +13,7 @@ struct DeviceProfile: Codable, Identifiable {
     var autoStopClippingEnabled: Bool
     var volume: Float      // 0.0 to 1.0 (for HDMI/software volume)
     var isEQEnabled: Bool
+    var isEQFiltersEnabled: Bool
 
     init(
         deviceUID: String,
@@ -22,7 +23,8 @@ struct DeviceProfile: Codable, Identifiable {
         preGain: Float = 0.0,
         autoStopClippingEnabled: Bool = false,
         volume: Float = 1.0,
-        isEQEnabled: Bool = true
+        isEQEnabled: Bool = true,
+        isEQFiltersEnabled: Bool = true
     ) {
         self.deviceUID = deviceUID
         self.deviceName = deviceName
@@ -32,6 +34,7 @@ struct DeviceProfile: Codable, Identifiable {
         self.autoStopClippingEnabled = autoStopClippingEnabled
         self.volume = volume
         self.isEQEnabled = isEQEnabled
+        self.isEQFiltersEnabled = isEQFiltersEnabled
     }
 
     var effectiveBands: [EQBand] {
@@ -50,6 +53,7 @@ struct DeviceProfile: Codable, Identifiable {
         case autoStopClippingEnabled
         case volume
         case isEQEnabled
+        case isEQFiltersEnabled
     }
 
     init(from decoder: Decoder) throws {
@@ -63,6 +67,7 @@ struct DeviceProfile: Codable, Identifiable {
         autoStopClippingEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoStopClippingEnabled) ?? false
         volume = try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0
         isEQEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEQEnabled) ?? true
+        isEQFiltersEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEQFiltersEnabled) ?? true
     }
 
     func encode(to encoder: Encoder) throws {
@@ -76,6 +81,7 @@ struct DeviceProfile: Codable, Identifiable {
         try container.encode(autoStopClippingEnabled, forKey: .autoStopClippingEnabled)
         try container.encode(volume, forKey: .volume)
         try container.encode(isEQEnabled, forKey: .isEQEnabled)
+        try container.encode(isEQFiltersEnabled, forKey: .isEQFiltersEnabled)
     }
 }
 
@@ -111,7 +117,8 @@ class DeviceProfileManager: ObservableObject {
         preGain: Float,
         autoStopClippingEnabled: Bool,
         volume: Float,
-        isEQEnabled: Bool
+        isEQEnabled: Bool,
+        isEQFiltersEnabled: Bool
     ) {
         let profile = DeviceProfile(
             deviceUID: deviceUID,
@@ -121,7 +128,8 @@ class DeviceProfileManager: ObservableObject {
             preGain: preGain,
             autoStopClippingEnabled: autoStopClippingEnabled,
             volume: volume,
-            isEQEnabled: isEQEnabled
+            isEQEnabled: isEQEnabled,
+            isEQFiltersEnabled: isEQFiltersEnabled
         )
         saveProfile(profile)
     }
