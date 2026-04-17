@@ -92,6 +92,14 @@ class AutoEQManager: ObservableObject {
         }
     }
 
+    func parseImportedEQ(content: String) throws -> AutoEQCurve {
+        do {
+            return try parseParametricEQ(content)
+        } catch {
+            return try parseGraphicEQ(content)
+        }
+    }
+
     private func fetchGraphicEQ(for headphone: AutoEQHeadphone, completion: @escaping (Result<AutoEQCurve, Error>) -> Void) {
         fetchText(at: headphone.graphicEQURL) { [weak self] result in
             guard let self = self else { return }

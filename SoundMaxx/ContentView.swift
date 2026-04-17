@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreAudio
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject var audioEngine: AudioEngine
@@ -11,11 +12,15 @@ struct ContentView: View {
     @State private var selectedOutputID: AudioDeviceID?
     @State private var showingSavePreset = false
     @State private var showingAutoEQ = false
+    @State private var showingEQImportPicker = false
     @State private var showingHelp = false
+    @State private var showingEQImportError = false
+    @State private var eqImportErrorMessage = ""
     @State private var newPresetName = ""
     @State private var didInitialStartup = false
     @StateObject private var launchAtLogin = LaunchAtLogin()
     private let settingsStore = AppSettingsStore.shared
+    private let autoEQManager = AutoEQManager.shared
 
     private let menuWidth: CGFloat = 800
 
@@ -71,6 +76,15 @@ struct ContentView: View {
         .onChange(of: eqModel.preGain) { newValue in
             audioEngine.setPreGain(newValue)
         }
+        .onChange(of: eqModel.outputGain) { newValue in
+            audioEngine.setOutputGain(newValue)
+        }
+        .onChange(of: eqModel.limiterEnabled) { newValue in
+            audioEngine.setLimiterEnabled(newValue)
+        }
+        .onChange(of: eqModel.limiterCeilingDB) { newValue in
+            audioEngine.setLimiterCeilingDB(newValue)
+        }
         .onChange(of: eqModel.autoStopClippingEnabled) { newValue in
             audioEngine.setAutoStopClippingEnabled(newValue)
         }
@@ -79,6 +93,17 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingSavePreset) {
             savePresetSheet
+        }
+        .fileImporter(
+            isPresented: $showingEQImportPicker,
+            allowedContentTypes: [.plainText, .text],
+            allowsMultipleSelection: false,
+            onCompletion: importEQFile
+        )
+        .alert("Import Failed", isPresented: $showingEQImportError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(eqImportErrorMessage)
         }
     }
 
@@ -91,6 +116,9 @@ struct ContentView: View {
                 audioEngine.setEQFiltersEnabled(eqModel.isEQFiltersEnabled)
                 // Sync volume from profile to engine
                 audioEngine.setPreGain(eqModel.preGain)
+                audioEngine.setOutputGain(eqModel.outputGain)
+                audioEngine.setLimiterEnabled(eqModel.limiterEnabled)
+                audioEngine.setLimiterCeilingDB(eqModel.limiterCeilingDB)
                 audioEngine.setAutoStopClippingEnabled(eqModel.autoStopClippingEnabled)
                 audioEngine.setVolume(eqModel.volume)
             }
@@ -323,7 +351,7 @@ struct ContentView: View {
     private var preGainControl: some View {
         VStack(spacing: 4) {
             HStack {
-                Text("Pre-Gain")
+                Text("Preamp")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .frame(width: 55, alignment: .leading)
@@ -336,7 +364,7 @@ struct ContentView: View {
                     in: -24...24,
                     step: 0.1
                 )
-                .help("Adjust pre-gain before EQ filters (range: -24 dB to +24 dB)")
+                .help("Headroom control before EQ filters. Keep this negative when EQ has positive boosts.")
 
                 Text(String(format: "%+.1f dB", eqModel.preGain))
                     .font(.caption.monospacedDigit())
@@ -344,50 +372,134 @@ struct ContentView: View {
                     .frame(width: 62, alignment: .trailing)
             }
 
-            Text("Applied before EQ filters")
+            HStack {
+                Text("Output")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 55, alignment: .leading)
+
+                Slider(
+                    value: Binding(
+                        get: { Double(eqModel.outputGain) },
+                        set: { eqModel.setOutputGain(gain: Float($0)) }
+                    ),
+                    in: -24...24,
+                    step: 0.1
+                )
+                .help("User loudness control after EQ and before limiter.")
+
+                Text(String(format: "%+.1f dB", eqModel.outputGain))
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.secondary)
+                    .frame(width: 62, alignment: .trailing)
+            }
+
+            Text("Signal chain: Input -> Preamp -> EQ -> Output Gain -> Limiter -> Output")
                 .font(.caption2)
                 .foregroundColor(.secondary)
 
-            Toggle(
-                "auto-stop clipping",
-                isOn: Binding(
-                    get: { eqModel.autoStopClippingEnabled },
-                    set: { eqModel.autoStopClippingEnabled = $0 }
+            HStack(spacing: 10) {
+                Toggle(
+                    "auto-stop EQ clipping",
+                    isOn: Binding(
+                        get: { eqModel.autoStopClippingEnabled },
+                        set: { eqModel.autoStopClippingEnabled = $0 }
+                    )
                 )
-            )
-            .toggleStyle(.button)
-            .controlSize(.small)
-            .help("When enabled, clipping is detected on output and pre-gain is automatically reduced to prevent clipping.")
+                .toggleStyle(.button)
+                .controlSize(.small)
+                .help("Automatically lowers preamp when the EQ stage clips.")
+
+                Toggle(
+                    "Limiter",
+                    isOn: Binding(
+                        get: { eqModel.limiterEnabled },
+                        set: { eqModel.setLimiterEnabled($0) }
+                    )
+                )
+                .toggleStyle(.button)
+                .controlSize(.small)
+                .help("Final safety stage to avoid output overs.")
+
+                Spacer()
+            }
+
+            HStack {
+                Text("Ceiling")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 55, alignment: .leading)
+
+                Slider(
+                    value: Binding(
+                        get: { Double(eqModel.limiterCeilingDB) },
+                        set: { eqModel.setLimiterCeilingDB(Float($0)) }
+                    ),
+                    in: -6.0 ... -0.1,
+                    step: 0.1
+                )
+                .disabled(!eqModel.limiterEnabled)
+                .help("Limiter ceiling in dBFS.")
+
+                Text(String(format: "%.1f dBFS", eqModel.limiterCeilingDB))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(.secondary)
+                    .frame(width: 62, alignment: .trailing)
+            }
 
             HStack(spacing: 8) {
                 Circle()
-                    .fill(audioEngine.clippingDetected ? Color.red : Color.secondary.opacity(0.28))
+                    .fill(audioEngine.eqStageClippingDetected ? Color.red : Color.secondary.opacity(0.28))
                     .frame(width: 8, height: 8)
 
-                Text(audioEngine.clippingDetected ? "CLIPPING" : "No clipping")
+                Text(audioEngine.eqStageClippingDetected ? "EQ stage clipping" : "EQ stage clean")
                     .font(.caption2.weight(.semibold))
-                    .foregroundColor(audioEngine.clippingDetected ? .red : .secondary)
+                    .foregroundColor(audioEngine.eqStageClippingDetected ? .red : .secondary)
 
                 Spacer()
 
-                Text(peakLabel)
+                Text(eqPeakLabel)
                     .font(.caption2.monospacedDigit())
                     .foregroundColor(.secondary)
             }
-            .help("Lights red when output exceeds 0 dBFS. The indicator holds briefly so short clips are visible.")
+            .help("Preamp + EQ stage peak/clipping monitor.")
+
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(audioEngine.outputStageClippingDetected ? Color.red : Color.secondary.opacity(0.28))
+                    .frame(width: 8, height: 8)
+
+                Text(audioEngine.outputStageClippingDetected ? "Output stage clipping" : "Output stage clean")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(audioEngine.outputStageClippingDetected ? .red : .secondary)
+
+                Spacer()
+
+                Text(outputPeakLabel)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(.secondary)
+            }
+            .help("Final post-limiter output peak/clipping monitor.")
         }
         .opacity(eqModel.isEnabled ? 1.0 : 0.5)
     }
 
-    private var peakLabel: String {
-        let peak = audioEngine.outputPeakSample
-        guard peak > 0 else { return "Peak -inf dBFS" }
+    private var eqPeakLabel: String {
+        peakLabel(from: audioEngine.eqStagePeakSample, prefix: "EQ")
+    }
+
+    private var outputPeakLabel: String {
+        peakLabel(from: audioEngine.outputPeakSample, prefix: "Out")
+    }
+
+    private func peakLabel(from peak: Float, prefix: String) -> String {
+        guard peak > 0 else { return "\(prefix) -inf dBFS" }
 
         let dBFS = 20.0 * log10(Double(peak))
         if dBFS >= 0 {
-            return String(format: "Peak +%.1f dBFS", dBFS)
+            return String(format: "\(prefix) +%.1f dBFS", dBFS)
         }
-        return String(format: "Peak %.1f dBFS", dBFS)
+        return String(format: "\(prefix) %.1f dBFS", dBFS)
     }
 
     private var presetControls: some View {
@@ -452,6 +564,14 @@ struct ContentView: View {
                     AutoEQView()
                         .environmentObject(eqModel)
                 }
+
+                Button {
+                    showingEQImportPicker = true
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .buttonStyle(.borderless)
+                .help("Import an AutoEQ ParametricEQ.txt file")
 
                 if let customPreset = eqModel.selectedCustomPreset {
                     Button {
@@ -746,6 +866,59 @@ struct ContentView: View {
             settings.selectedInputDeviceID = selectedInputID.map { Int32($0) }
             settings.selectedOutputDeviceID = selectedOutputID.map { Int32($0) }
         }
+    }
+
+    private func importEQFile(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let fileURL = urls.first else { return }
+
+            do {
+                let fileContents = try readTextFile(fileURL)
+                let curve = try autoEQManager.parseImportedEQ(content: fileContents)
+
+                if let importedBands = curve.parametricBands, !importedBands.isEmpty {
+                    eqModel.parametricBands = importedBands
+                } else {
+                    eqModel.parametricBands = EQBand.tenBand(withGains: curve.bands)
+                }
+
+                eqModel.setPreGain(gain: curve.preGain)
+                eqModel.clearPresetSelection()
+            } catch {
+                eqImportErrorMessage = "Could not parse this EQ file. Use AutoEQ ParametricEQ.txt (or GraphicEQ.txt) format."
+                showingEQImportError = true
+            }
+
+        case .failure(let error):
+            eqImportErrorMessage = error.localizedDescription
+            showingEQImportError = true
+        }
+    }
+
+    private func readTextFile(_ url: URL) throws -> String {
+        let isAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if isAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let data = try Data(contentsOf: url)
+
+        if let text = String(data: data, encoding: .utf8) {
+            return text
+        }
+
+        if let text = String(data: data, encoding: .ascii) {
+            return text
+        }
+
+        if let text = String(data: data, encoding: .isoLatin1) {
+            return text
+        }
+
+        throw CocoaError(.fileReadInapplicableStringEncoding)
     }
 }
 
