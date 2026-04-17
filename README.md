@@ -8,9 +8,11 @@ Project website: [https://brimell.github.io/SoundMaxx/](https://brimell.github.i
 
 ## Screenshots
 
-<img src="docs/Screenshot%202026-04-17%20at%2020.26.21.png" alt="SoundMaxx screenshot 1" width="700" />
+Tray Menu:
+<img src="docs/Screenshot%202026-04-17%20at%2020.26.21.png" alt="SoundMaxx screenshot 1" width="500" />
 
-<img src="docs/Screenshot%202026-04-17%20at%2020.26.42.png" alt="SoundMaxx screenshot 2" width="700" />
+Main Menu:
+<img src="docs/Screenshot%202026-04-17%20at%2020.26.42.png" alt="SoundMaxx screenshot 2" width="500" />
 
 ## Features
 
