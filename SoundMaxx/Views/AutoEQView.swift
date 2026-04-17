@@ -7,6 +7,7 @@ struct AutoEQView: View {
 
     @State private var searchText = ""
     @State private var showFavoritesOnly = false
+    @State private var prioritizeFavorites = true
     @State private var selectedTypeFilter: String = "all"
     @State private var selectedHeadphone: AutoEQHeadphone?
     @FocusState private var isSearchFocused: Bool
@@ -127,6 +128,11 @@ struct AutoEQView: View {
                 .font(.caption)
                 .help("Show only starred headphones")
 
+            Toggle("Favorites first", isOn: $prioritizeFavorites)
+                .toggleStyle(.switch)
+                .font(.caption)
+                .help("Sort favorites to the top of results")
+
             Spacer()
 
                 Button {
@@ -180,11 +186,26 @@ struct AutoEQView: View {
             selectedTypeFilter == "all" || headphone.type == selectedTypeFilter
         }
 
-        guard showFavoritesOnly else {
-            return typeFiltered
+        let sortedByFavorite = typeFiltered.sorted { lhs, rhs in
+            let lhsFavorite = autoEQManager.isFavorite(lhs)
+            let rhsFavorite = autoEQManager.isFavorite(rhs)
+
+            if prioritizeFavorites && lhsFavorite != rhsFavorite {
+                return lhsFavorite && !rhsFavorite
+            }
+
+            if lhs.name.localizedCaseInsensitiveCompare(rhs.name) != .orderedSame {
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+
+            return lhs.sourceDisplayName.localizedCaseInsensitiveCompare(rhs.sourceDisplayName) == .orderedAscending
         }
 
-        return typeFiltered.filter { autoEQManager.isFavorite($0) }
+        guard showFavoritesOnly else {
+            return sortedByFavorite
+        }
+
+        return sortedByFavorite.filter { autoEQManager.isFavorite($0) }
     }
 
     private var emptyStateHint: String {

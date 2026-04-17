@@ -27,6 +27,7 @@ Project website: [https://brimell.github.io/SoundMaxx/](https://brimell.github.i
 - **Shortcut Target Selection** - Choose exactly which output devices are included in shortcut cycling
 - **AutoEQ Integration** - Search and apply headphone correction curves from [AutoEQ](https://github.com/jaakkopasanen/AutoEq), including manual catalog refresh
 - **AutoEQ Quick Filters** - Narrow catalog by headphone type and favorites for faster selection
+- **AutoEQ Favorites Priority** - Optionally keep starred headphones pinned at the top of results
 - **AutoEQ Text Import** - Import AutoEQ `ParametricEQ.txt` or `GraphicEQ.txt` files directly
 - **Quick Help Popover** - Built-in in-app guidance for setup and controls
 - **Menu Bar App** - Always accessible, no dock icon clutter
