@@ -186,7 +186,6 @@ class EQModel: ObservableObject {
     private func autoSaveToDeviceProfile() {
         guard autoSaveEnabled,
               !isLoadingProfile,
-              hasDeviceProfile,
               let uid = currentDeviceUID,
               let name = currentDeviceName else { return }
 
@@ -207,6 +206,7 @@ class EQModel: ObservableObject {
             selectedBuiltInPresetName: selectedBuiltInPreset?.rawValue,
             selectedCustomPresetID: selectedCustomPreset?.id.uuidString ?? pendingCustomPresetID
         )
+        hasDeviceProfile = true
     }
 
     func applyBuiltInPreset(_ preset: BuiltInPreset) {
@@ -329,6 +329,15 @@ class EQModel: ObservableObject {
         guard parametricBands.count > Self.minimumBandCount else { return }
         var updatedBands = parametricBands
         updatedBands.removeLast()
+        parametricBands = updatedBands
+        clearPresetSelection()
+    }
+
+    func removeBand(at index: Int) {
+        guard parametricBands.count > Self.minimumBandCount else { return }
+        guard parametricBands.indices.contains(index) else { return }
+        var updatedBands = parametricBands
+        updatedBands.remove(at: index)
         parametricBands = updatedBands
         clearPresetSelection()
     }

@@ -313,26 +313,56 @@ struct ContentView: View {
     }
 
     private var eqSliders: some View {
-        HStack(alignment: .top, spacing: 8) {
-            ForEach(eqModel.parametricBands.indices, id: \.self) { index in
-                VStack(spacing: 4) {
-                    EQSliderView(
-                        value: Binding(
-                            get: { eqModel.parametricBands[index].gain },
-                            set: { eqModel.setBandGain(index: index, gain: $0) }
-                        ),
-                        label: "",
-                        tooltip: bandTooltip(index)
-                    )
+        VStack(spacing: 6) {
+            HStack {
+                Text("\(eqModel.parametricBands.count) band\(eqModel.parametricBands.count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
 
-                    if !isCompactLayout {
-                        inlineBandControls(index)
+                Spacer()
+
+                Button {
+                    eqModel.removeLastBand()
+                } label: {
+                    Image(systemName: "minus")
+                }
+                .buttonStyle(.borderless)
+                .disabled(eqModel.parametricBands.count <= EQModel.minimumBandCount)
+                .help("Remove last band")
+
+                Button {
+                    eqModel.addBand()
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.borderless)
+                .help("Add a new band")
+            }
+
+            ScrollView(.horizontal, showsIndicators: true) {
+                HStack(alignment: .top, spacing: 8) {
+                    ForEach(eqModel.parametricBands.indices, id: \.self) { index in
+                        VStack(spacing: 4) {
+                            EQSliderView(
+                                value: Binding(
+                                    get: { eqModel.parametricBands[index].gain },
+                                    set: { eqModel.setBandGain(index: index, gain: $0) }
+                                ),
+                                label: "",
+                                tooltip: bandTooltip(index)
+                            )
+
+                            if !isCompactLayout {
+                                inlineBandControls(index)
+                            }
+                        }
                     }
                 }
+                .padding(.vertical, 2)
             }
+            .opacity(eqModel.isEnabled ? (eqModel.isEQFiltersEnabled ? 1.0 : 0.7) : 0.5)
+            .disabled(!eqModel.isEnabled)
         }
-        .opacity(eqModel.isEnabled ? (eqModel.isEQFiltersEnabled ? 1.0 : 0.7) : 0.5)
-        .disabled(!eqModel.isEnabled)
     }
 
     private func inlineBandControls(_ index: Int) -> some View {
@@ -383,6 +413,17 @@ struct ContentView: View {
             .font(.system(size: 10, weight: .medium, design: .monospaced))
             .multilineTextAlignment(.center)
             .help("Q factor")
+
+            Button {
+                eqModel.removeBand(at: index)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9))
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.red)
+            .disabled(eqModel.parametricBands.count <= EQModel.minimumBandCount)
+            .help("Remove this band")
         }
         .frame(width: 60)
     }
