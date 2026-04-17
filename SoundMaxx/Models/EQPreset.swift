@@ -127,6 +127,9 @@ struct CustomPreset: Codable, Identifiable, Equatable {
     var values: [Float]
     var parametricBands: [EQBand]?
     var preGain: Float
+    var outputGain: Float
+    var limiterEnabled: Bool
+    var limiterCeilingDB: Float
 
     init(name: String, values: [Float]) {
         self.id = UUID()
@@ -134,14 +137,20 @@ struct CustomPreset: Codable, Identifiable, Equatable {
         self.values = values
         self.parametricBands = EQBand.tenBand(withGains: values)
         self.preGain = 0.0
+        self.outputGain = 0.0
+        self.limiterEnabled = true
+        self.limiterCeilingDB = -1.0
     }
 
-    init(name: String, bands: [EQBand], preGain: Float = 0.0) {
+    init(name: String, bands: [EQBand], preGain: Float = 0.0, outputGain: Float = 0.0, limiterEnabled: Bool = true, limiterCeilingDB: Float = -1.0) {
         self.id = UUID()
         self.name = name
         self.values = bands.map { $0.gain }
         self.parametricBands = bands
         self.preGain = preGain
+        self.outputGain = outputGain
+        self.limiterEnabled = limiterEnabled
+        self.limiterCeilingDB = limiterCeilingDB
     }
 
     var effectiveBands: [EQBand] {
@@ -154,6 +163,9 @@ struct CustomPreset: Codable, Identifiable, Equatable {
         case values
         case parametricBands
         case preGain
+        case outputGain
+        case limiterEnabled
+        case limiterCeilingDB
     }
 
     init(from decoder: Decoder) throws {
@@ -163,6 +175,9 @@ struct CustomPreset: Codable, Identifiable, Equatable {
         values = try container.decode([Float].self, forKey: .values)
         parametricBands = try container.decodeIfPresent([EQBand].self, forKey: .parametricBands)
         preGain = try container.decodeIfPresent(Float.self, forKey: .preGain) ?? 0.0
+        outputGain = try container.decodeIfPresent(Float.self, forKey: .outputGain) ?? 0.0
+        limiterEnabled = try container.decodeIfPresent(Bool.self, forKey: .limiterEnabled) ?? true
+        limiterCeilingDB = try container.decodeIfPresent(Float.self, forKey: .limiterCeilingDB) ?? -1.0
     }
 
     func encode(to encoder: Encoder) throws {
@@ -172,6 +187,9 @@ struct CustomPreset: Codable, Identifiable, Equatable {
         try container.encode(values, forKey: .values)
         try container.encode(parametricBands, forKey: .parametricBands)
         try container.encode(preGain, forKey: .preGain)
+        try container.encode(outputGain, forKey: .outputGain)
+        try container.encode(limiterEnabled, forKey: .limiterEnabled)
+        try container.encode(limiterCeilingDB, forKey: .limiterCeilingDB)
     }
 }
 
@@ -185,8 +203,15 @@ class PresetManager: ObservableObject {
         loadPresets()
     }
 
-    func savePreset(name: String, bands: [EQBand], preGain: Float = 0.0) {
-        let preset = CustomPreset(name: name, bands: bands, preGain: preGain)
+    func savePreset(name: String, bands: [EQBand], preGain: Float = 0.0, outputGain: Float = 0.0, limiterEnabled: Bool = true, limiterCeilingDB: Float = -1.0) {
+        let preset = CustomPreset(
+            name: name,
+            bands: bands,
+            preGain: preGain,
+            outputGain: outputGain,
+            limiterEnabled: limiterEnabled,
+            limiterCeilingDB: limiterCeilingDB
+        )
         customPresets.append(preset)
         persistPresets()
     }
@@ -196,11 +221,14 @@ class PresetManager: ObservableObject {
         persistPresets()
     }
 
-    func updatePreset(_ preset: CustomPreset, bands: [EQBand], preGain: Float = 0.0) {
+    func updatePreset(_ preset: CustomPreset, bands: [EQBand], preGain: Float = 0.0, outputGain: Float = 0.0, limiterEnabled: Bool = true, limiterCeilingDB: Float = -1.0) {
         if let index = customPresets.firstIndex(where: { $0.id == preset.id }) {
             customPresets[index].values = bands.map { $0.gain }
             customPresets[index].parametricBands = bands
             customPresets[index].preGain = preGain
+            customPresets[index].outputGain = outputGain
+            customPresets[index].limiterEnabled = limiterEnabled
+            customPresets[index].limiterCeilingDB = limiterCeilingDB
             persistPresets()
         }
     }

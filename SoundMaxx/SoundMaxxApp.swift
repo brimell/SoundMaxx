@@ -125,6 +125,9 @@ struct SoundMaxxApp: App {
         audioEngine.setBands(eqModel.parametricBands)
         audioEngine.setBypass(!eqModel.isEnabled)
         audioEngine.setPreGain(eqModel.preGain)
+        audioEngine.setOutputGain(eqModel.outputGain)
+        audioEngine.setLimiterEnabled(eqModel.limiterEnabled)
+        audioEngine.setLimiterCeilingDB(eqModel.limiterCeilingDB)
         audioEngine.setAutoStopClippingEnabled(eqModel.autoStopClippingEnabled)
         audioEngine.setVolume(eqModel.volume)
     }

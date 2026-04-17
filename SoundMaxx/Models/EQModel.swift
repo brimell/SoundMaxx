@@ -6,6 +6,9 @@ class EQModel: ObservableObject {
     @Published var isEnabled: Bool = true
     @Published var isEQFiltersEnabled: Bool = true
     @Published var preGain: Float = 0.0
+    @Published var outputGain: Float = 0.0
+    @Published var limiterEnabled: Bool = true
+    @Published var limiterCeilingDB: Float = -1.0
     @Published var autoStopClippingEnabled: Bool = false
     @Published var volume: Float = 1.0
     @Published var selectedBuiltInPreset: BuiltInPreset? = .flat
@@ -67,6 +70,29 @@ class EQModel: ObservableObject {
             }
             .store(in: &cancellables)
 
+        $outputGain
+            .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.saveSettings()
+                self?.autoSaveToDeviceProfile()
+            }
+            .store(in: &cancellables)
+
+        $limiterEnabled
+            .sink { [weak self] _ in
+                self?.saveSettings()
+                self?.autoSaveToDeviceProfile()
+            }
+            .store(in: &cancellables)
+
+        $limiterCeilingDB
+            .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.saveSettings()
+                self?.autoSaveToDeviceProfile()
+            }
+            .store(in: &cancellables)
+
         $autoStopClippingEnabled
             .sink { [weak self] _ in
                 self?.saveSettings()
@@ -108,6 +134,9 @@ class EQModel: ObservableObject {
             eqBands: bandsAsDouble,
             parametricBands: parametricBands,
             preGain: preGain,
+            outputGain: outputGain,
+            limiterEnabled: limiterEnabled,
+            limiterCeilingDB: limiterCeilingDB,
             autoStopClippingEnabled: autoStopClippingEnabled,
             volume: volume,
             isEQEnabled: isEnabled,
@@ -126,6 +155,9 @@ class EQModel: ObservableObject {
         isLoadingProfile = true
         parametricBands = profile.effectiveBands
         preGain = profile.preGain
+        outputGain = profile.outputGain
+        limiterEnabled = profile.limiterEnabled
+        limiterCeilingDB = profile.limiterCeilingDB
         autoStopClippingEnabled = profile.autoStopClippingEnabled
         volume = profile.volume
         isEnabled = profile.isEQEnabled
@@ -148,6 +180,9 @@ class EQModel: ObservableObject {
             eqBands: bandsAsDouble,
             parametricBands: parametricBands,
             preGain: preGain,
+            outputGain: outputGain,
+            limiterEnabled: limiterEnabled,
+            limiterCeilingDB: limiterCeilingDB,
             autoStopClippingEnabled: autoStopClippingEnabled,
             volume: volume,
             isEQEnabled: isEnabled,
@@ -160,6 +195,7 @@ class EQModel: ObservableObject {
         selectedCustomPreset = nil
         parametricBands = preset.bands
         preGain = 0.0
+        outputGain = 0.0
     }
 
     func applyCustomPreset(_ preset: CustomPreset) {
@@ -167,6 +203,9 @@ class EQModel: ObservableObject {
         selectedBuiltInPreset = nil
         parametricBands = preset.effectiveBands
         preGain = preset.preGain
+        outputGain = preset.outputGain
+        limiterEnabled = preset.limiterEnabled
+        limiterCeilingDB = preset.limiterCeilingDB
     }
 
     func reset() {
@@ -223,12 +262,30 @@ class EQModel: ObservableObject {
         clearPresetSelection()
     }
 
+    func setOutputGain(gain: Float) {
+        outputGain = min(max(gain, -24.0), 24.0)
+        clearPresetSelection()
+    }
+
+    func setLimiterEnabled(_ enabled: Bool) {
+        limiterEnabled = enabled
+        clearPresetSelection()
+    }
+
+    func setLimiterCeilingDB(_ value: Float) {
+        limiterCeilingDB = min(max(value, -6.0), -0.1)
+        clearPresetSelection()
+    }
+
     private func saveSettings() {
         settingsStore.update { settings in
             settings.parametricBands = parametricBands
             settings.isEnabled = isEnabled
             settings.isEQFiltersEnabled = isEQFiltersEnabled
             settings.preGain = preGain
+            settings.outputGain = outputGain
+            settings.limiterEnabled = limiterEnabled
+            settings.limiterCeilingDB = limiterCeilingDB
             settings.autoStopClippingEnabled = autoStopClippingEnabled
             settings.volume = volume
             settings.autoSaveEnabled = autoSaveEnabled
@@ -254,6 +311,9 @@ class EQModel: ObservableObject {
             isEnabled = settings.isEnabled
             isEQFiltersEnabled = settings.isEQFiltersEnabled
             preGain = settings.preGain
+            outputGain = settings.outputGain
+            limiterEnabled = settings.limiterEnabled
+            limiterCeilingDB = settings.limiterCeilingDB
             autoStopClippingEnabled = settings.autoStopClippingEnabled
             volume = settings.volume
             autoSaveEnabled = settings.autoSaveEnabled
@@ -276,6 +336,9 @@ class EQModel: ObservableObject {
 
         isEnabled = UserDefaults.standard.object(forKey: legacyEnabledKey) as? Bool ?? true
         preGain = UserDefaults.standard.object(forKey: legacyPreGainKey) as? Float ?? 0.0
+        outputGain = 0.0
+        limiterEnabled = true
+        limiterCeilingDB = -1.0
         autoStopClippingEnabled = UserDefaults.standard.object(forKey: legacyAutoStopClippingKey) as? Bool ?? false
 
         if let presetName = UserDefaults.standard.string(forKey: legacyBuiltInPresetKey),

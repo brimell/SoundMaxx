@@ -7,6 +7,9 @@ struct AppSettings: Codable {
     var isEnabled: Bool = true
     var isEQFiltersEnabled: Bool = true
     var preGain: Float = 0.0
+    var outputGain: Float = 0.0
+    var limiterEnabled: Bool = true
+    var limiterCeilingDB: Float = -1.0
     var autoStopClippingEnabled: Bool = false
     var volume: Float = 1.0
     var autoSaveEnabled: Bool = true
@@ -20,6 +23,9 @@ struct AppSettings: Codable {
         case isEnabled
         case isEQFiltersEnabled
         case preGain
+        case outputGain
+        case limiterEnabled
+        case limiterCeilingDB
         case autoStopClippingEnabled
         case volume
         case autoSaveEnabled
@@ -36,8 +42,11 @@ struct AppSettings: Codable {
 
         parametricBands = try container.decodeIfPresent([EQBand].self, forKey: .parametricBands) ?? EQBand.defaultTenBand
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
-    isEQFiltersEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEQFiltersEnabled) ?? true
+        isEQFiltersEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEQFiltersEnabled) ?? true
         preGain = try container.decodeIfPresent(Float.self, forKey: .preGain) ?? 0.0
+        outputGain = try container.decodeIfPresent(Float.self, forKey: .outputGain) ?? 0.0
+        limiterEnabled = try container.decodeIfPresent(Bool.self, forKey: .limiterEnabled) ?? true
+        limiterCeilingDB = try container.decodeIfPresent(Float.self, forKey: .limiterCeilingDB) ?? -1.0
         autoStopClippingEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoStopClippingEnabled) ?? false
         volume = try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0
         autoSaveEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoSaveEnabled) ?? true
@@ -52,8 +61,11 @@ struct AppSettings: Codable {
 
         try container.encode(parametricBands, forKey: .parametricBands)
         try container.encode(isEnabled, forKey: .isEnabled)
-    try container.encode(isEQFiltersEnabled, forKey: .isEQFiltersEnabled)
+        try container.encode(isEQFiltersEnabled, forKey: .isEQFiltersEnabled)
         try container.encode(preGain, forKey: .preGain)
+        try container.encode(outputGain, forKey: .outputGain)
+        try container.encode(limiterEnabled, forKey: .limiterEnabled)
+        try container.encode(limiterCeilingDB, forKey: .limiterCeilingDB)
         try container.encode(autoStopClippingEnabled, forKey: .autoStopClippingEnabled)
         try container.encode(volume, forKey: .volume)
         try container.encode(autoSaveEnabled, forKey: .autoSaveEnabled)

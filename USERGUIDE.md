@@ -126,6 +126,20 @@ brew install blackhole-2ch
 
 Use the toggle switch in the header to quickly bypass the EQ and hear your original audio.
 
+### Gain Staging (Important)
+
+SoundMaxx uses a proper gain chain:
+
+`Input -> Preamp -> EQ -> Output Gain -> Limiter -> Output`
+
+- **Preamp**: headroom control before EQ. If you have boosted EQ bands, keep preamp negative.
+- **Output Gain**: user loudness control after EQ.
+- **Limiter**: final clip guard with configurable ceiling (default -1 dBFS).
+
+Two clip indicators are shown in the app:
+- **EQ stage clipping**: clipping before output gain/limiter.
+- **Output stage clipping**: clipping at the final output.
+
 ### Reset
 
 Click the **Reset** button to return all bands to 0dB (flat response).

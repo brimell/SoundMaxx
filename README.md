@@ -12,6 +12,9 @@ SoundMaxx sits in your menu bar and applies real-time EQ processing to all syste
 - **Built-in Presets** - Flat, Bass Boost, Treble Boost, Vocal, Rock, Electronic, Acoustic
 - **Custom Presets** - Save and load your own EQ configurations
 - **Per-Device Profiles** - Save EQ per output device, auto-restore on switch, and auto-save ongoing tweaks
+- **Proper Gain Staging** - Separate preamp (headroom) and output gain (loudness) controls
+- **Limiter / Clip Guard** - Final output safety stage with configurable ceiling (default: -1 dBFS)
+- **Dual Clip Meters** - Independent EQ-stage and output-stage clipping indicators
 - **HDMI Volume Control** - Software volume slider for HDMI outputs (macOS disables hardware control)
 - **AutoEQ Integration** - Search and apply headphone correction curves from [AutoEQ](https://github.com/jaakkopasanen/AutoEq)
 - **Quick Help Popover** - Built-in in-app guidance for setup and controls
@@ -85,11 +88,11 @@ xcodebuild -project SoundMaxx.xcodeproj -scheme SoundMaxx -configuration Release
 ### Audio Signal Flow
 
 ```
-┌─────────────┐    ┌───────────┐    ┌──────────────┐    ┌─────────────┐
-│  Your Apps  │ →  │ BlackHole │ →  │   SoundMaxx  │ →  │  Speakers   │
-│ (Spotify,   │    │   (2ch)   │    │  (EQ + DSP)  │    │ (Real Audio │
-│  YouTube)   │    │           │    │              │    │   Output)   │
-└─────────────┘    └───────────┘    └──────────────┘    └─────────────┘
+┌─────────────┐    ┌───────────┐    ┌──────────────────────────────────────┐    ┌─────────────┐
+│  Your Apps  │ →  │ BlackHole │ →  │               SoundMaxx              │ →  │  Speakers   │
+│ (Spotify,   │    │   (2ch)   │    │ Preamp → EQ → Output Gain → Limiter │    │ (Real Audio │
+│  YouTube)   │    │           │    │                                      │    │   Output)   │
+└─────────────┘    └───────────┘    └──────────────────────────────────────┘    └─────────────┘
 ```
 
 ## Usage

@@ -10,6 +10,9 @@ struct DeviceProfile: Codable, Identifiable {
     var eqBands: [Double]  // 10 bands, -12 to +12
     var parametricBands: [EQBand]?
     var preGain: Float     // -24.0 to +24.0
+    var outputGain: Float  // -24.0 to +24.0
+    var limiterEnabled: Bool
+    var limiterCeilingDB: Float
     var autoStopClippingEnabled: Bool
     var volume: Float      // 0.0 to 1.0 (for HDMI/software volume)
     var isEQEnabled: Bool
@@ -21,6 +24,9 @@ struct DeviceProfile: Codable, Identifiable {
         eqBands: [Double] = Array(repeating: 0.0, count: 10),
         parametricBands: [EQBand]? = nil,
         preGain: Float = 0.0,
+        outputGain: Float = 0.0,
+        limiterEnabled: Bool = true,
+        limiterCeilingDB: Float = -1.0,
         autoStopClippingEnabled: Bool = false,
         volume: Float = 1.0,
         isEQEnabled: Bool = true,
@@ -31,6 +37,9 @@ struct DeviceProfile: Codable, Identifiable {
         self.eqBands = eqBands
         self.parametricBands = parametricBands
         self.preGain = preGain
+        self.outputGain = outputGain
+        self.limiterEnabled = limiterEnabled
+        self.limiterCeilingDB = limiterCeilingDB
         self.autoStopClippingEnabled = autoStopClippingEnabled
         self.volume = volume
         self.isEQEnabled = isEQEnabled
@@ -50,6 +59,9 @@ struct DeviceProfile: Codable, Identifiable {
         case eqBands
         case parametricBands
         case preGain
+        case outputGain
+        case limiterEnabled
+        case limiterCeilingDB
         case autoStopClippingEnabled
         case volume
         case isEQEnabled
@@ -64,6 +76,9 @@ struct DeviceProfile: Codable, Identifiable {
         eqBands = try container.decodeIfPresent([Double].self, forKey: .eqBands) ?? Array(repeating: 0.0, count: 10)
         parametricBands = try container.decodeIfPresent([EQBand].self, forKey: .parametricBands)
         preGain = try container.decodeIfPresent(Float.self, forKey: .preGain) ?? 0.0
+        outputGain = try container.decodeIfPresent(Float.self, forKey: .outputGain) ?? 0.0
+        limiterEnabled = try container.decodeIfPresent(Bool.self, forKey: .limiterEnabled) ?? true
+        limiterCeilingDB = try container.decodeIfPresent(Float.self, forKey: .limiterCeilingDB) ?? -1.0
         autoStopClippingEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoStopClippingEnabled) ?? false
         volume = try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0
         isEQEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEQEnabled) ?? true
@@ -78,6 +93,9 @@ struct DeviceProfile: Codable, Identifiable {
         try container.encode(eqBands, forKey: .eqBands)
         try container.encode(parametricBands, forKey: .parametricBands)
         try container.encode(preGain, forKey: .preGain)
+        try container.encode(outputGain, forKey: .outputGain)
+        try container.encode(limiterEnabled, forKey: .limiterEnabled)
+        try container.encode(limiterCeilingDB, forKey: .limiterCeilingDB)
         try container.encode(autoStopClippingEnabled, forKey: .autoStopClippingEnabled)
         try container.encode(volume, forKey: .volume)
         try container.encode(isEQEnabled, forKey: .isEQEnabled)
@@ -115,6 +133,9 @@ class DeviceProfileManager: ObservableObject {
         eqBands: [Double],
         parametricBands: [EQBand],
         preGain: Float,
+        outputGain: Float,
+        limiterEnabled: Bool,
+        limiterCeilingDB: Float,
         autoStopClippingEnabled: Bool,
         volume: Float,
         isEQEnabled: Bool,
@@ -126,6 +147,9 @@ class DeviceProfileManager: ObservableObject {
             eqBands: eqBands,
             parametricBands: parametricBands,
             preGain: preGain,
+            outputGain: outputGain,
+            limiterEnabled: limiterEnabled,
+            limiterCeilingDB: limiterCeilingDB,
             autoStopClippingEnabled: autoStopClippingEnabled,
             volume: volume,
             isEQEnabled: isEQEnabled,

@@ -184,9 +184,9 @@ struct ContentView: View {
 
             Group {
                 helpRow(icon: "slider.vertical.3", title: "EQ Sliders", desc: "Drag up to boost, down to cut (±12dB)")
-                helpRow(icon: "arrow.up.and.down.circle", title: "Pre-Gain", desc: "Adjust overall EQ input level before filters")
+                helpRow(icon: "arrow.up.and.down.circle", title: "Preamp + Output", desc: "Preamp controls EQ headroom, Output controls loudness")
                 helpRow(icon: "arrow.left.arrow.right.square", title: "EQ Switch", desc: "Toggle filters on/off for A/B comparison while keeping pre-gain")
-                helpRow(icon: "waveform.path.ecg", title: "auto-stop clipping", desc: "Automatically lowers pre-gain if output starts clipping")
+                helpRow(icon: "waveform.path.ecg", title: "Clip Monitoring", desc: "Separate EQ-stage and output-stage clipping indicators")
                 helpRow(icon: "speaker.wave.2", title: "Volume", desc: "Software volume for HDMI outputs")
                 helpRow(icon: "square.and.arrow.down", title: "Presets", desc: "Select or save EQ configurations")
                 helpRow(icon: "headphones", title: "AutoEQ", desc: "Apply headphone correction curves")
@@ -769,7 +769,14 @@ struct ContentView: View {
 
                 Button("Save") {
                     if !newPresetName.isEmpty {
-                        presetManager.savePreset(name: newPresetName, bands: eqModel.parametricBands, preGain: eqModel.preGain)
+                        presetManager.savePreset(
+                            name: newPresetName,
+                            bands: eqModel.parametricBands,
+                            preGain: eqModel.preGain,
+                            outputGain: eqModel.outputGain,
+                            limiterEnabled: eqModel.limiterEnabled,
+                            limiterCeilingDB: eqModel.limiterCeilingDB
+                        )
                         showingSavePreset = false
                     }
                 }
@@ -786,6 +793,9 @@ struct ContentView: View {
         audioEngine.setBypass(!eqModel.isEnabled)
         audioEngine.setEQFiltersEnabled(eqModel.isEQFiltersEnabled)
         audioEngine.setPreGain(eqModel.preGain)
+        audioEngine.setOutputGain(eqModel.outputGain)
+        audioEngine.setLimiterEnabled(eqModel.limiterEnabled)
+        audioEngine.setLimiterCeilingDB(eqModel.limiterCeilingDB)
         audioEngine.setAutoStopClippingEnabled(eqModel.autoStopClippingEnabled)
         audioEngine.setVolume(eqModel.volume)
     }

@@ -293,3 +293,57 @@ class ParametricEQ {
         }
     }
 }
+
+/// Lightweight stereo-linked limiter used as the final output safety stage.
+class OutputLimiter {
+    private let sampleRate: Float
+    private var ceilingDB: Float
+    private var ceilingLinear: Float
+    private var currentGain: Float = 1.0
+
+    // Conservative defaults: fast attack, moderate release.
+    private let attackMs: Float = 1.5
+    private let releaseMs: Float = 80.0
+    private let attackCoeff: Float
+    private let releaseCoeff: Float
+
+    init(sampleRate: Float, ceilingDB: Float = -1.0) {
+        self.sampleRate = max(8_000.0, sampleRate)
+        self.attackCoeff = expf(-1.0 / (attackMs * 0.001 * self.sampleRate))
+        self.releaseCoeff = expf(-1.0 / (releaseMs * 0.001 * self.sampleRate))
+        let clampedCeiling = max(-6.0, min(-0.1, ceilingDB))
+        self.ceilingDB = clampedCeiling
+        self.ceilingLinear = powf(10.0, clampedCeiling / 20.0)
+    }
+
+    func setCeilingDB(_ value: Float) {
+        let clamped = max(-6.0, min(-0.1, value))
+        guard clamped != ceilingDB else { return }
+        ceilingDB = clamped
+        ceilingLinear = powf(10.0, ceilingDB / 20.0)
+    }
+
+    func process(left: Float, right: Float) -> (left: Float, right: Float) {
+        let stereoPeak = max(max(fabsf(left), fabsf(right)), 1e-9)
+        let desiredGain = min(1.0, ceilingLinear / stereoPeak)
+
+        if desiredGain < currentGain {
+            currentGain = (attackCoeff * currentGain) + ((1.0 - attackCoeff) * desiredGain)
+        } else {
+            currentGain = (releaseCoeff * currentGain) + ((1.0 - releaseCoeff) * desiredGain)
+        }
+
+        var outLeft = left * currentGain
+        var outRight = right * currentGain
+
+        // Final hard safety clamp at the configured ceiling.
+        outLeft = max(-ceilingLinear, min(ceilingLinear, outLeft))
+        outRight = max(-ceilingLinear, min(ceilingLinear, outRight))
+
+        return (outLeft, outRight)
+    }
+
+    func reset() {
+        currentGain = 1.0
+    }
+}

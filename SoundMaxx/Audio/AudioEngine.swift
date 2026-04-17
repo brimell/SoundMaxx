@@ -12,6 +12,7 @@ class AudioEngine: ObservableObject {
     private var inputRenderFrameCapacity: UInt32 = 0
 
     private var ringBuffer: RingBuffer?
+    private var outputLimiter: OutputLimiter?
     private let bufferSize: UInt32 = 4096
     private var currentBands: [EQBand] = EQBand.defaultTenBand
     private var currentBypassState = false
@@ -26,8 +27,16 @@ class AudioEngine: ObservableObject {
     // Software volume control (0.0 to 1.0)
     @Published var softwareVolume: Float = 1.0
     @Published var preGain: Float = 0.0
+    @Published var outputGain: Float = 0.0
+    @Published var limiterEnabled: Bool = true
+    @Published var limiterCeilingDB: Float = -1.0
     @Published var autoStopClippingEnabled: Bool = false
+    @Published private(set) var eqStagePeakSample: Float = 0.0
+    @Published private(set) var eqStageClippingDetected: Bool = false
     @Published private(set) var outputPeakSample: Float = 0.0
+    @Published private(set) var outputStageClippingDetected: Bool = false
+
+    // Backward-compatible alias for existing UI usage.
     @Published private(set) var clippingDetected: Bool = false
 
     private var autoStopClippingRuntimeEnabled = false
@@ -36,10 +45,13 @@ class AudioEngine: ObservableObject {
     private let autoPreGainHeadroomDB: Float = 0.2
     private let clippingIndicatorHoldDuration: TimeInterval = 1.0
     private let meterPublishInterval: TimeInterval = 1.0 / 20.0
-    private var clippingHoldUntilTime: TimeInterval = 0
+    private var eqClippingHoldUntilTime: TimeInterval = 0
+    private var outputClippingHoldUntilTime: TimeInterval = 0
     private var lastMeterPublishTime: TimeInterval = 0
-    private var lastMeterPeakSample: Float = 0.0
-    private var lastMeterClippingDetected = false
+    private var lastEQMeterPeakSample: Float = 0.0
+    private var lastOutputMeterPeakSample: Float = 0.0
+    private var lastEQMeterClippingDetected = false
+    private var lastOutputMeterClippingDetected = false
 
     // Device info
     @Published var outputDeviceNeedsVolumeControl = false
@@ -61,6 +73,22 @@ class AudioEngine: ObservableObject {
     func setPreGain(_ gain: Float) {
         preGain = max(-24.0, min(24.0, gain))
         parametricEQ?.setPreGain(preGain)
+    }
+
+    func setOutputGain(_ gain: Float) {
+        outputGain = max(-24.0, min(24.0, gain))
+    }
+
+    func setLimiterEnabled(_ enabled: Bool) {
+        limiterEnabled = enabled
+        if enabled {
+            outputLimiter?.reset()
+        }
+    }
+
+    func setLimiterCeilingDB(_ value: Float) {
+        limiterCeilingDB = max(-6.0, min(-0.1, value))
+        outputLimiter?.setCeilingDB(limiterCeilingDB)
     }
 
     func setAutoStopClippingEnabled(_ enabled: Bool) {
@@ -216,6 +244,9 @@ class AudioEngine: ObservableObject {
             parametricEQ?.bypass = currentBypassState
             parametricEQ?.setFiltersEnabled(currentEQFiltersEnabled)
             parametricEQ?.setPreGain(preGain)
+
+            // Final output limiter/clip guard.
+            outputLimiter = OutputLimiter(sampleRate: Float(workingSampleRate), ceilingDB: limiterCeilingDB)
 
             // Start units
             var status = AudioOutputUnitStart(inputUnit!)
@@ -503,6 +534,7 @@ class AudioEngine: ObservableObject {
             outputUnit = nil
         }
         parametricEQ = nil
+        outputLimiter = nil
         ringBuffer = nil
         releaseInputRenderBuffers()
         resetClippingMeterState()
@@ -561,7 +593,7 @@ class AudioEngine: ObservableObject {
             }
         }
 
-        // Apply EQ processing to the output buffer
+        // Apply EQ processing to the output buffer.
         if let eq = parametricEQ, !eq.bypass {
             let bufferListPtr = UnsafeMutableAudioBufferListPointer(ioData)
             for (channelIndex, buffer) in bufferListPtr.enumerated() where channelIndex < 2 {
@@ -570,11 +602,47 @@ class AudioEngine: ObservableObject {
             }
         }
 
-        // Apply software volume and capture peak level for clipping indication.
-        let autoStopEnabled = autoStopClippingRuntimeEnabled
-        let volume = softwareVolume
-        var peakSample: Float = 0.0
         let bufferListPtr = UnsafeMutableAudioBufferListPointer(ioData)
+
+        // Meter the EQ stage before post-gain and limiter.
+        var eqStagePeak: Float = 0.0
+        for buffer in bufferListPtr {
+            guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
+            for i in 0..<Int(inNumberFrames) {
+                let absSample = fabsf(data[i])
+                if absSample > eqStagePeak {
+                    eqStagePeak = absSample
+                }
+            }
+        }
+
+        // Auto-stop clipping is a headroom guard for the EQ stage.
+        let autoStopEnabled = autoStopClippingRuntimeEnabled
+        let processingEnabled = !currentBypassState
+        if autoStopEnabled && processingEnabled {
+            reducePreGainIfClipping(eqStagePeak)
+        }
+
+        // Apply post-EQ output gain.
+        let outputGainLinear = powf(10.0, outputGain / 20.0)
+        if processingEnabled && fabsf(outputGainLinear - 1.0) > 0.0001 {
+            for buffer in bufferListPtr {
+                guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
+                for i in 0..<Int(inNumberFrames) {
+                    data[i] *= outputGainLinear
+                }
+            }
+        }
+
+        // Apply final limiter / clip guard.
+        if processingEnabled, limiterEnabled, let limiter = outputLimiter {
+            limiter.setCeilingDB(limiterCeilingDB)
+            applyLimiter(limiter, to: ioData, frameCount: Int(inNumberFrames))
+        }
+
+        // Apply final software volume (mainly for outputs without hardware volume control).
+        let volume = softwareVolume
+        var outputStagePeak: Float = 0.0
         for buffer in bufferListPtr {
             guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
             for i in 0..<Int(inNumberFrames) {
@@ -583,19 +651,43 @@ class AudioEngine: ObservableObject {
                 }
 
                 let absSample = fabsf(data[i])
-                if absSample > peakSample {
-                    peakSample = absSample
+                if absSample > outputStagePeak {
+                    outputStagePeak = absSample
                 }
             }
         }
 
-        publishOutputPeak(peakSample)
-
-        if autoStopEnabled {
-            reducePreGainIfClipping(peakSample)
-        }
+        publishStagePeaks(eqStagePeakSample: eqStagePeak, outputStagePeakSample: outputStagePeak)
 
         return noErr
+    }
+
+    private func applyLimiter(
+        _ limiter: OutputLimiter,
+        to ioData: UnsafeMutablePointer<AudioBufferList>,
+        frameCount: Int
+    ) {
+        let bufferListPtr = UnsafeMutableAudioBufferListPointer(ioData)
+        guard !bufferListPtr.isEmpty else { return }
+
+        let leftData = bufferListPtr.indices.contains(0)
+            ? bufferListPtr[0].mData?.assumingMemoryBound(to: Float.self)
+            : nil
+        let rightData = bufferListPtr.indices.contains(1)
+            ? bufferListPtr[1].mData?.assumingMemoryBound(to: Float.self)
+            : nil
+
+        // Stereo-linked limiting; mono streams use the same value for both sides.
+        for frame in 0..<frameCount {
+            let leftIn = leftData?[frame] ?? 0.0
+            let rightIn = rightData?[frame] ?? leftIn
+            let limited = limiter.process(left: leftIn, right: rightIn)
+
+            leftData?[frame] = limited.left
+            if rightData != nil {
+                rightData?[frame] = limited.right
+            }
+        }
     }
 
     private func reducePreGainIfClipping(_ peakSample: Float) {
@@ -621,39 +713,61 @@ class AudioEngine: ObservableObject {
         }
     }
 
-    private func publishOutputPeak(_ peakSample: Float) {
+    private func publishStagePeaks(eqStagePeakSample: Float, outputStagePeakSample: Float) {
         let now = Date().timeIntervalSinceReferenceDate
-        if peakSample > 1.0 {
-            clippingHoldUntilTime = now + clippingIndicatorHoldDuration
+        if eqStagePeakSample > 1.0 {
+            eqClippingHoldUntilTime = now + clippingIndicatorHoldDuration
+        }
+        if outputStagePeakSample > 1.0 {
+            outputClippingHoldUntilTime = now + clippingIndicatorHoldDuration
         }
 
-        let clippingActive = now <= clippingHoldUntilTime
-        let clippingStateChanged = clippingActive != lastMeterClippingDetected
-        let peakChangedEnough = fabsf(peakSample - lastMeterPeakSample) >= 0.01
+        let eqClippingActive = now <= eqClippingHoldUntilTime
+        let outputClippingActive = now <= outputClippingHoldUntilTime
+
+        let clippingStateChanged =
+            (eqClippingActive != lastEQMeterClippingDetected) ||
+            (outputClippingActive != lastOutputMeterClippingDetected)
+
+        let peakChangedEnough =
+            fabsf(eqStagePeakSample - lastEQMeterPeakSample) >= 0.01 ||
+            fabsf(outputStagePeakSample - lastOutputMeterPeakSample) >= 0.01
+
         let publishDue = (now - lastMeterPublishTime) >= meterPublishInterval
 
         guard clippingStateChanged || peakChangedEnough || publishDue else { return }
 
         lastMeterPublishTime = now
-        lastMeterPeakSample = peakSample
-        lastMeterClippingDetected = clippingActive
+        lastEQMeterPeakSample = eqStagePeakSample
+        lastOutputMeterPeakSample = outputStagePeakSample
+        lastEQMeterClippingDetected = eqClippingActive
+        lastOutputMeterClippingDetected = outputClippingActive
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.outputPeakSample = peakSample
-            self.clippingDetected = clippingActive
+            self.eqStagePeakSample = eqStagePeakSample
+            self.eqStageClippingDetected = eqClippingActive
+            self.outputPeakSample = outputStagePeakSample
+            self.outputStageClippingDetected = outputClippingActive
+            self.clippingDetected = outputClippingActive
         }
     }
 
     private func resetClippingMeterState() {
-        clippingHoldUntilTime = 0
+        eqClippingHoldUntilTime = 0
+        outputClippingHoldUntilTime = 0
         lastMeterPublishTime = 0
-        lastMeterPeakSample = 0
-        lastMeterClippingDetected = false
+        lastEQMeterPeakSample = 0
+        lastOutputMeterPeakSample = 0
+        lastEQMeterClippingDetected = false
+        lastOutputMeterClippingDetected = false
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            self.eqStagePeakSample = 0
+            self.eqStageClippingDetected = false
             self.outputPeakSample = 0
+            self.outputStageClippingDetected = false
             self.clippingDetected = false
         }
     }
