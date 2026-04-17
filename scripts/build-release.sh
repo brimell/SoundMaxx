@@ -37,14 +37,20 @@ echo "App built successfully at: $APP_PATH"
 
 # Create DMG
 echo "Creating DMG..."
-DMG_DIR="$BUILD_DIR/dmg"
-mkdir -p "$DMG_DIR"
+TEMP_DMG_DIR=$(mktemp -d)
+STAGING_DIR="$TEMP_DMG_DIR/${APP_NAME}-dmg"
+mkdir -p "$STAGING_DIR"
 
-# Copy app to DMG staging
-cp -R "$APP_PATH" "$DMG_DIR/"
+cleanup() {
+    rm -rf "$TEMP_DMG_DIR"
+}
+trap cleanup EXIT
+
+# Copy app to temporary DMG staging
+cp -R "$APP_PATH" "$STAGING_DIR/"
 
 # Create symbolic link to Applications
-ln -s /Applications "$DMG_DIR/Applications"
+ln -s /Applications "$STAGING_DIR/Applications"
 
 # Create the DMG
 DMG_PATH="$BUILD_DIR/$DMG_NAME.dmg"
@@ -52,9 +58,7 @@ DMG_PATH="$BUILD_DIR/$DMG_NAME.dmg"
 # Use create-dmg for a nicer looking installer
 if command -v create-dmg >/dev/null 2>&1; then
     echo "Creating customized DMG with create-dmg..."
-    # Use a temp directory for DMG creation to avoid cluttering build dir
-    TEMP_DMG_DIR=$(mktemp -d)
-    cp -R "$DMG_DIR/" "$TEMP_DMG_DIR/"
+    TEMP_DMG_PATH="$TEMP_DMG_DIR/$DMG_NAME.dmg"
     
     create-dmg \
         --volname "$APP_NAME" \
@@ -65,15 +69,14 @@ if command -v create-dmg >/dev/null 2>&1; then
         --hide-extension "$APP_NAME.app" \
         --app-drop-link 480 170 \
         --no-internet-enable \
-        "$DMG_PATH" \
-        "$TEMP_DMG_DIR"
-    
-    # Clean up temp directory
-    rm -rf "$TEMP_DMG_DIR"
+        "$TEMP_DMG_PATH" \
+        "$STAGING_DIR"
+
+    mv -f "$TEMP_DMG_PATH" "$DMG_PATH"
 else
     echo "create-dmg not found, using basic hdiutil..."
     hdiutil create -volname "$APP_NAME" \
-        -srcfolder "$DMG_DIR" \
+        -srcfolder "$STAGING_DIR" \
         -ov -format UDZO \
         "$DMG_PATH"
 fi
