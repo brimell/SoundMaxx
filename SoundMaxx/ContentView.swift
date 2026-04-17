@@ -18,7 +18,6 @@ struct ContentView: View {
     @StateObject private var presetManager = PresetManager()
 
     @State private var selectedInputID: AudioDeviceID?
-    @State private var selectedOutputID: AudioDeviceID?
     @State private var showingSavePreset = false
     @State private var showingAutoEQ = false
     @State private var showingEQImportPicker = false
@@ -98,11 +97,6 @@ struct ContentView: View {
                 selectedInputID = newDeviceID
             }
         }
-        .onReceive(audioEngine.$selectedOutputDeviceID) { newDeviceID in
-            if selectedOutputID != newDeviceID {
-                selectedOutputID = newDeviceID
-            }
-        }
         .onChange(of: eqModel.parametricBands) { newValue in
             audioEngine.setBands(newValue)
         }
@@ -155,7 +149,7 @@ struct ContentView: View {
                 .foregroundColor(.secondary)
                 .frame(width: 50, alignment: .leading)
 
-            Picker("", selection: $selectedOutputID) {
+            Picker("", selection: selectedOutputBinding) {
                 Text("Select...").tag(nil as AudioDeviceID?)
                 ForEach(deviceManager.outputDevices) { device in
                     Text(device.name).tag(device.id as AudioDeviceID?)
@@ -163,12 +157,6 @@ struct ContentView: View {
             }
             .labelsHidden()
             .help("Choose the output device")
-            .onChange(of: selectedOutputID) { newDevice in
-                if let deviceID = newDevice {
-                    audioEngine.setOutputDevice(deviceID)
-                }
-                persistSelectedDevices()
-            }
 
             Button {
                 cycleToNextOutputDevice()
@@ -779,6 +767,18 @@ struct ContentView: View {
         }
     }
 
+    private var selectedOutputBinding: Binding<AudioDeviceID?> {
+        Binding(
+            get: { audioEngine.selectedOutputDeviceID },
+            set: { newDevice in
+                if let deviceID = newDevice {
+                    audioEngine.setOutputDevice(deviceID)
+                }
+                persistSelectedDevices()
+            }
+        )
+    }
+
     private var deviceControls: some View {
         VStack(spacing: 8) {
             HStack {
@@ -807,7 +807,7 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                     .frame(width: 50, alignment: .leading)
 
-                Picker("", selection: $selectedOutputID) {
+                Picker("", selection: selectedOutputBinding) {
                     Text("Select...").tag(nil as AudioDeviceID?)
                     ForEach(deviceManager.outputDevices) { device in
                         Text(device.name).tag(device.id as AudioDeviceID?)
@@ -815,12 +815,6 @@ struct ContentView: View {
                 }
                 .labelsHidden()
                 .help("Select your speakers or headphones")
-                .onChange(of: selectedOutputID) { newDevice in
-                    if let deviceID = newDevice {
-                        audioEngine.setOutputDevice(deviceID)
-                    }
-                    persistSelectedDevices()
-                }
 
                 Button {
                     cycleToNextOutputDevice()
@@ -1108,10 +1102,9 @@ struct ContentView: View {
             }
         }
 
-        if selectedOutputID == nil, let savedOutputID = settings.selectedOutputDeviceID {
+        if audioEngine.selectedOutputDeviceID == nil, let savedOutputID = settings.selectedOutputDeviceID {
             let outputID = AudioDeviceID(savedOutputID)
             if deviceManager.outputDevices.contains(where: { $0.id == outputID }) {
-                selectedOutputID = outputID
                 audioEngine.setOutputDevice(outputID)
             }
         }
@@ -1120,15 +1113,14 @@ struct ContentView: View {
     private func persistSelectedDevices() {
         settingsStore.update { settings in
             settings.selectedInputDeviceID = selectedInputID.map { Int32($0) }
-            settings.selectedOutputDeviceID = selectedOutputID.map { Int32($0) }
+            settings.selectedOutputDeviceID = audioEngine.selectedOutputDeviceID.map { Int32($0) }
         }
     }
 
     private func cycleToNextOutputDevice() {
-        let currentDeviceID = selectedOutputID ?? audioEngine.selectedOutputDeviceID
+        let currentDeviceID = audioEngine.selectedOutputDeviceID
         guard let nextDevice = deviceManager.nextOutputDevice(after: currentDeviceID) else { return }
 
-        selectedOutputID = nextDevice.id
         audioEngine.setOutputDevice(nextDevice.id)
         persistSelectedDevices()
     }
