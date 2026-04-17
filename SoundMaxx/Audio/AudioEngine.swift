@@ -956,6 +956,9 @@ final class SpectrumAnalyzer {
     private var splitImag: [Float]
     private var magnitudes: [Float]
     private var binToBar: [Int]
+    private var barBinContributors: [Int]
+    private var barNearestLowerContributor: [Int]
+    private var barNearestUpperContributor: [Int]
     private var workingBars: [Float]
 
     private(set) var currentBars: [Float]
@@ -986,6 +989,9 @@ final class SpectrumAnalyzer {
         self.splitImag = Array(repeating: 0.0, count: fftSize / 2)
         self.magnitudes = Array(repeating: 0.0, count: fftSize / 2)
         self.binToBar = Array(repeating: -1, count: fftSize / 2)
+        self.barBinContributors = Array(repeating: 0, count: barCount)
+        self.barNearestLowerContributor = Array(repeating: -1, count: barCount)
+        self.barNearestUpperContributor = Array(repeating: -1, count: barCount)
         self.workingBars = Array(repeating: 0.0, count: barCount)
         self.currentBars = Array(repeating: 0.0, count: barCount)
 
@@ -1027,6 +1033,10 @@ final class SpectrumAnalyzer {
     private func buildBinToBarMap() {
         guard analysisMaxFrequency > minFrequency else { return }
 
+        for index in 0..<barBinContributors.count {
+            barBinContributors[index] = 0
+        }
+
         let minLog = log10f(minFrequency)
         let maxLog = log10f(analysisMaxFrequency)
         let logRange = max(maxLog - minLog, 0.0001)
@@ -1041,6 +1051,23 @@ final class SpectrumAnalyzer {
             let clamped = max(0.0, min(1.0, normalized))
             let barIndex = min(barCount - 1, Int(clamped * Float(barCount - 1)))
             binToBar[bin] = barIndex
+            barBinContributors[barIndex] += 1
+        }
+
+        var lowerContributor = -1
+        for index in 0..<barCount {
+            if barBinContributors[index] > 0 {
+                lowerContributor = index
+            }
+            barNearestLowerContributor[index] = lowerContributor
+        }
+
+        var upperContributor = -1
+        for index in stride(from: barCount - 1, through: 0, by: -1) {
+            if barBinContributors[index] > 0 {
+                upperContributor = index
+            }
+            barNearestUpperContributor[index] = upperContributor
         }
     }
 
@@ -1094,6 +1121,30 @@ final class SpectrumAnalyzer {
             let magnitude = magnitudes[bin]
             if magnitude > workingBars[barIndex] {
                 workingBars[barIndex] = magnitude
+            }
+        }
+
+        // Many low-frequency log bars have no direct FFT-bin assignment.
+        // Fill them from neighboring populated bars to avoid visible gaps.
+        for barIndex in 0..<barCount where barBinContributors[barIndex] == 0 {
+            let lower = barNearestLowerContributor[barIndex]
+            let upper = barNearestUpperContributor[barIndex]
+
+            if lower >= 0 && upper >= 0 {
+                if lower == upper {
+                    workingBars[barIndex] = workingBars[lower]
+                    continue
+                }
+
+                let t = Float(barIndex - lower) / Float(upper - lower)
+                let lowerDB = 20.0 * log10f(max(workingBars[lower], 1e-12))
+                let upperDB = 20.0 * log10f(max(workingBars[upper], 1e-12))
+                let interpolatedDB = lowerDB + ((upperDB - lowerDB) * t)
+                workingBars[barIndex] = powf(10.0, interpolatedDB / 20.0)
+            } else if lower >= 0 {
+                workingBars[barIndex] = workingBars[lower]
+            } else if upper >= 0 {
+                workingBars[barIndex] = workingBars[upper]
             }
         }
 
