@@ -216,6 +216,13 @@ struct ContentView: View {
             Text("SoundMaxx EQ")
                 .font(.title3.weight(.semibold))
 
+            Text("Designed and built by Bill Rimell")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.primary.opacity(0.8))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Color.primary.opacity(0.08), in: Capsule())
+
             Spacer()
 
             Button {
@@ -1035,14 +1042,6 @@ struct ContentView: View {
                 } else {
                     fullFooter
                 }
-            }
-
-            HStack {
-                Spacer()
-
-                Text("Designed and built by Bill Rimell")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
             }
 
             if let error = audioEngine.errorMessage {
