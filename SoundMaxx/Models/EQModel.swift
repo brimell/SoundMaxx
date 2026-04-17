@@ -468,6 +468,11 @@ class EQModel: ObservableObject {
         clearPresetSelection()
     }
 
+    func reloadFromStoredSettings() {
+        loadSettings()
+        clearHistory()
+    }
+
     func undo() {
         guard let previousSnapshot = undoHistory.popLast() else { return }
         redoHistory.append(makeHistorySnapshot())

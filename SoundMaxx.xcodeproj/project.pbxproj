@@ -14,6 +14,7 @@
 		2F8C0C1985B0255E7CB26D51 /* EQSliderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78ED980AAED8A73537EC45E /* EQSliderView.swift */; };
 		412E933C0BCF56E5DCA7AA27 /* AutoEQView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA9C36C360A279CD47D5823 /* AutoEQView.swift */; };
 		4469824EEEA88F4E660DF7AB /* AudioDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C444BFFBC1DBCB0D06DD4304 /* AudioDeviceManager.swift */; };
+		7C9A31E8B4F245D1920A6E11 /* SettingsTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C9A31E8B4F245D1920A6E12 /* SettingsTransfer.swift */; };
 		8D8D801DB1C99A988241BF5B /* BiquadFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51FD6D0200D7D0FE3101D83A /* BiquadFilter.swift */; };
 		A1B2C3D4E5F60718293A4B5C /* AppSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* AppSettingsStore.swift */; };
 		B44A1A949BC2A06490A7617D /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07907DEB12E0717D58D55A19 /* LaunchAtLogin.swift */; };
@@ -31,6 +32,7 @@
 		5008C2369D4FCA33AE27B502 /* SoundMaxx.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SoundMaxx.entitlements; sourceTree = "<group>"; };
 		51FD6D0200D7D0FE3101D83A /* BiquadFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiquadFilter.swift; sourceTree = "<group>"; };
 		5E8A60E655B672C965CAE226 /* EQModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EQModel.swift; sourceTree = "<group>"; };
+		7C9A31E8B4F245D1920A6E12 /* SettingsTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTransfer.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* AppSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsStore.swift; sourceTree = "<group>"; };
 		B05A2248530D9686BF6F7124 /* AutoEQManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoEQManager.swift; sourceTree = "<group>"; };
 		B42DA36A1F8703E28C5084AF /* SoundMaxxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundMaxxApp.swift; sourceTree = "<group>"; };
@@ -77,6 +79,7 @@
 				5E8A60E655B672C965CAE226 /* EQModel.swift */,
 				03EC78AF207C511ECF968539 /* EQPreset.swift */,
 				07907DEB12E0717D58D55A19 /* LaunchAtLogin.swift */,
+				7C9A31E8B4F245D1920A6E12 /* SettingsTransfer.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -183,6 +186,7 @@
 				B4E9A50D6F86F805FBF71FC5 /* EQPreset.swift in Sources */,
 				2F8C0C1985B0255E7CB26D51 /* EQSliderView.swift in Sources */,
 				B44A1A949BC2A06490A7617D /* LaunchAtLogin.swift in Sources */,
+				7C9A31E8B4F245D1920A6E11 /* SettingsTransfer.swift in Sources */,
 				DDE2D0ED56A330F4F2279D60 /* SoundMaxxApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

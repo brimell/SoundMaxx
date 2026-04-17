@@ -104,10 +104,21 @@ class AppSettingsStore {
         return loadFromDefaults()
     }
 
+    /// Returns current settings or defaults if none are stored yet.
+    func current() -> AppSettings {
+        load() ?? AppSettings()
+    }
+
     /// Updates settings with a mutation closure and persists them
     func update(_ mutation: (inout AppSettings) -> Void) {
         var settings = load() ?? AppSettings()
         mutation(&settings)
+        cachedSettings = settings
+        persistToDefaults(settings)
+    }
+
+    /// Replaces all app settings with imported values.
+    func replace(with settings: AppSettings) {
         cachedSettings = settings
         persistToDefaults(settings)
     }

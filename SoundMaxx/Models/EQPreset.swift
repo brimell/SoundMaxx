@@ -233,6 +233,11 @@ class PresetManager: ObservableObject {
         }
     }
 
+    func replacePresets(with presets: [CustomPreset]) {
+        customPresets = presets
+        persistPresets()
+    }
+
     private func persistPresets() {
         if let data = try? JSONEncoder().encode(customPresets) {
             UserDefaults.standard.set(data, forKey: presetsKey)

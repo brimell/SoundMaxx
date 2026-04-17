@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreAudio
 import UniformTypeIdentifiers
+import AppKit
 
 enum ContentViewLayout {
     case compact
@@ -25,6 +26,8 @@ struct ContentView: View {
     @State private var showingHelp = false
     @State private var showingEQImportError = false
     @State private var eqImportErrorMessage = ""
+    @State private var showingSettingsTransferMessage = false
+    @State private var settingsTransferMessage = ""
     @State private var newPresetName = ""
     @State private var didInitialStartup = false
     @State private var normalizeSpectrumAnalyzer = false
@@ -147,6 +150,11 @@ struct ContentView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(eqImportErrorMessage)
+        }
+        .alert("Settings Transfer", isPresented: $showingSettingsTransferMessage) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(settingsTransferMessage)
         }
     }
 
@@ -949,6 +957,26 @@ struct ContentView: View {
                 deviceProfileControls
             }
 
+            HStack {
+                Button {
+                    exportSettingsBackup()
+                } label: {
+                    Label("Export Settings", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.borderless)
+                .help("Export app settings, custom presets, and device profiles to a JSON backup")
+
+                Spacer()
+
+                Button {
+                    importSettingsBackup()
+                } label: {
+                    Label("Import Settings", systemImage: "square.and.arrow.down")
+                }
+                .buttonStyle(.borderless)
+                .help("Import a SoundMaxx JSON backup and apply it immediately")
+            }
+
         }
     }
 
@@ -1213,7 +1241,7 @@ struct ContentView: View {
     }
 
     private func autoSelectDevicesAndStart() {
-        restoreSavedDeviceSelections()
+        restoreSavedDeviceSelections(force: false)
 
         if selectedInputID == nil, let blackhole = deviceManager.findBlackHole() {
             selectedInputID = blackhole.id
@@ -1234,10 +1262,10 @@ struct ContentView: View {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func restoreSavedDeviceSelections() {
+    private func restoreSavedDeviceSelections(force: Bool = false) {
         guard let settings = settingsStore.load() else { return }
 
-        if selectedInputID == nil, let savedInputID = settings.selectedInputDeviceID {
+        if (force || selectedInputID == nil), let savedInputID = settings.selectedInputDeviceID {
             let inputID = AudioDeviceID(savedInputID)
             if deviceManager.inputDevices.contains(where: { $0.id == inputID }) {
                 selectedInputID = inputID
@@ -1245,7 +1273,7 @@ struct ContentView: View {
             }
         }
 
-        if audioEngine.selectedOutputDeviceID == nil, let savedOutputID = settings.selectedOutputDeviceID {
+        if (force || audioEngine.selectedOutputDeviceID == nil), let savedOutputID = settings.selectedOutputDeviceID {
             let outputID = AudioDeviceID(savedOutputID)
             if deviceManager.outputDevices.contains(where: { $0.id == outputID }) {
                 audioEngine.setOutputDevice(outputID)
@@ -1259,6 +1287,63 @@ struct ContentView: View {
             settings.selectedOutputDeviceID = audioEngine.selectedOutputDeviceID.map { Int32($0) }
             settings.shortcutOutputDeviceUIDs = shortcutOutputDeviceUIDs.isEmpty ? nil : shortcutOutputDeviceUIDs
         }
+    }
+
+    private func exportSettingsBackup() {
+        let savePanel = NSSavePanel()
+        savePanel.title = "Export SoundMaxx Settings"
+        savePanel.nameFieldStringValue = "SoundMaxx-Settings-Backup.json"
+        savePanel.allowedContentTypes = [.json]
+        savePanel.isExtensionHidden = false
+
+        guard savePanel.runModal() == .OK, let destinationURL = savePanel.url else { return }
+
+        let bundle = SettingsTransferBundle(
+            appSettings: settingsStore.current(),
+            deviceProfiles: DeviceProfileManager.shared.allProfiles(),
+            customPresets: presetManager.customPresets
+        )
+
+        do {
+            try SettingsTransfer.write(bundle, to: destinationURL)
+            settingsTransferMessage = "Settings exported to \(destinationURL.lastPathComponent)."
+        } catch {
+            settingsTransferMessage = "Export failed: \(error.localizedDescription)"
+        }
+
+        showingSettingsTransferMessage = true
+    }
+
+    private func importSettingsBackup() {
+        let openPanel = NSOpenPanel()
+        openPanel.title = "Import SoundMaxx Settings"
+        openPanel.allowedContentTypes = [.json]
+        openPanel.allowsMultipleSelection = false
+
+        guard openPanel.runModal() == .OK, let sourceURL = openPanel.url else { return }
+
+        do {
+            let bundle = try SettingsTransfer.read(from: sourceURL)
+
+            settingsStore.replace(with: bundle.appSettings)
+            DeviceProfileManager.shared.replaceProfiles(with: bundle.deviceProfiles)
+            presetManager.replacePresets(with: bundle.customPresets)
+
+            loadShortcutOutputTargets()
+            deviceManager.refreshDevices()
+            eqModel.reloadFromStoredSettings()
+            eqModel.resolvePresetSelection(using: presetManager.customPresets)
+
+            restoreSavedDeviceSelections(force: true)
+            syncEQToEngine()
+            persistSelectedDevices()
+
+            settingsTransferMessage = "Settings imported from \(sourceURL.lastPathComponent)."
+        } catch {
+            settingsTransferMessage = "Import failed: \(error.localizedDescription)"
+        }
+
+        showingSettingsTransferMessage = true
     }
 
     private func cycleToNextOutputDevice() {

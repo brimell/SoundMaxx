@@ -183,6 +183,15 @@ class DeviceProfileManager: ObservableObject {
         return profiles[deviceUID] != nil
     }
 
+    func allProfiles() -> [String: DeviceProfile] {
+        profiles
+    }
+
+    func replaceProfiles(with newProfiles: [String: DeviceProfile]) {
+        profiles = newProfiles
+        persistProfiles()
+    }
+
     // MARK: - Persistence
 
     private func loadProfiles() {
