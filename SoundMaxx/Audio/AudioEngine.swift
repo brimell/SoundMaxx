@@ -641,6 +641,9 @@ class AudioEngine: ObservableObject {
             reducePreGainIfClipping(eqStagePeak)
         }
 
+        // Spectrum intentionally taps the post-EQ signal so frequency changes track EQ moves.
+        processSpectrum(bufferList: bufferListPtr, frameCount: Int(inNumberFrames))
+
         // Apply post-EQ output gain.
         let outputGainLinear = powf(10.0, outputGain / 20.0)
         if processingEnabled && fabsf(outputGainLinear - 1.0) > 0.0001 {
@@ -675,8 +678,6 @@ class AudioEngine: ObservableObject {
                 }
             }
         }
-
-        processSpectrum(bufferList: bufferListPtr, frameCount: Int(inNumberFrames))
 
         publishStagePeaks(
             eqStagePeakSample: eqStagePeak,

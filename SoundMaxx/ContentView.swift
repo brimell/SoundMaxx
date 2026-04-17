@@ -319,7 +319,7 @@ struct ContentView: View {
             sampleRate: audioEngine.processingSampleRate
         )
         .frame(height: isCompactLayout ? 108 : 132)
-        .help("Real-time output spectrum after EQ, volume, and limiter.")
+        .help("Real-time post-EQ spectrum (before output gain, limiter, and final volume).")
     }
 
     private var eqSliders: some View {
