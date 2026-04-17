@@ -43,16 +43,20 @@ struct SoundMaxxApp: App {
                 DispatchQueue.main.async {
                     if granted {
                         print("Microphone access granted")
+                        audioEngine.errorMessage = nil
                         startAudioServiceIfPossible(audioEngine: audioEngine, eqModel: eqModel)
                     } else {
                         print("Microphone access denied")
+                        audioEngine.errorMessage = AudioEngine.microphoneAccessDeniedMessage
                     }
                 }
             }
         case .denied, .restricted:
             print("Microphone access denied - please enable in System Settings > Privacy > Microphone")
+            audioEngine.errorMessage = AudioEngine.microphoneAccessDeniedMessage
         case .authorized:
             print("Microphone access already authorized")
+            audioEngine.errorMessage = nil
             startAudioServiceIfPossible(audioEngine: audioEngine, eqModel: eqModel)
         @unknown default:
             break

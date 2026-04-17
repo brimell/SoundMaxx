@@ -757,11 +757,6 @@ struct ContentView: View {
                 deviceProfileControls
             }
 
-            if let error = audioEngine.errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundColor(.red)
-            }
         }
     }
 
@@ -813,11 +808,20 @@ struct ContentView: View {
     }
 
     private var footer: some View {
-        Group {
-            if isCompactLayout {
-                compactFooter
-            } else {
-                fullFooter
+        VStack(alignment: .leading, spacing: 8) {
+            Group {
+                if isCompactLayout {
+                    compactFooter
+                } else {
+                    fullFooter
+                }
+            }
+
+            if let error = audioEngine.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

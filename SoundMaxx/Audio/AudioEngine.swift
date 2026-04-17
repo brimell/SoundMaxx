@@ -63,6 +63,7 @@ class AudioEngine: ObservableObject {
     var onPreGainAutoAdjusted: ((Float) -> Void)?
 
     static let bandFrequencies: [Float] = EQBand.defaultFrequencies
+    static let microphoneAccessDeniedMessage = "Microphone access is denied. SoundMaxx needs microphone permission to capture audio input. Enable it in System Settings > Privacy & Security > Microphone, then restart SoundMaxx."
 
     init() {}
 
@@ -173,6 +174,12 @@ class AudioEngine: ObservableObject {
 
     func start() {
         guard !isRunning else { return }
+
+        let micAuthorization = AVCaptureDevice.authorizationStatus(for: .audio)
+        guard micAuthorization == .authorized else {
+            errorMessage = Self.microphoneAccessDeniedMessage
+            return
+        }
 
         guard let inputDeviceID = selectedInputDeviceID else {
             errorMessage = "Please select an input device (BlackHole)"
