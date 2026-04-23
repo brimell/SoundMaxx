@@ -43,6 +43,9 @@ Main Menu:
 - **Menu Bar App** - Always accessible, no dock icon clutter
 - **Launch at Login** - Optional auto-start with your Mac
 - **Sample Rate Handling** - Attempts automatic sample-rate matching across input/output devices
+- **Configurable Latency & Buffer Controls** - Tune I/O buffer size, ring buffer capacity, and target queue depth to balance latency vs stability on your system
+- **Undo / Redo** - Full undo/redo history for EQ band changes (Cmd+Z / Cmd+Shift+Z)
+- **Settings Export / Import** - Back up and restore all app settings, custom presets, and device profiles as a JSON file
 
 ## Requirements
 
@@ -186,6 +189,34 @@ Use the global shortcut **Control+Option+Command+O** to jump to the next availab
 - By default, it cycles through all outputs
 - In the **Targets** menu, you can limit cycling to specific outputs (for example: speakers + headphones only)
 - Shortcut switches also update your saved output device selection
+
+### Latency & Buffer Controls
+
+SoundMaxx uses a three-stage buffering pipeline to balance latency and stability. All controls are in **Advanced Options → Latency**.
+
+| Control | Range | Effect |
+| ------- | ----- | ------ |
+| **I/O Buffer** | 64–4096 frames | How often audio is processed per callback. Lower = less latency, higher CPU pressure. |
+| **Ring Capacity** | 1×–16× | Internal buffer space (multiple of I/O buffer). Higher = more stable, more latency tolerance. |
+| **Target Queue** | 1×–ring capacity | Keeps the ring buffer near this depth, trimming older frames to prevent A/V drift. |
+
+The **Effective** readout shows the actual frame sizes negotiated with your audio hardware (devices may clamp to supported values).
+
+**Recommended starting points:**
+
+| Profile | I/O Buffer | Ring Capacity | Target Queue |
+| ------- | ---------- | ------------- | ------------ |
+| Balanced (default) | 256 | 4× | 2× |
+| Low Latency | 64–128 | 2–4× | 1–2× |
+| Maximum Stability | 512–1024 | 6–8× | 3–4× |
+
+- **Hearing crackles / pops** → increase I/O buffer or ring capacity
+- **Audio feels delayed** → decrease I/O buffer or target queue
+- **Audio drifts out of sync** → lower target queue
+- **Unstable when switching devices** → increase ring capacity
+- HDMI and Bluetooth outputs typically need higher buffer sizes
+
+Changing these settings briefly restarts the audio engine.
 
 ### Import AutoEQ Text Files
 

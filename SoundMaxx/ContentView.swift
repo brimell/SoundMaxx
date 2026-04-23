@@ -11,9 +11,11 @@ enum ContentViewLayout {
 struct ContentView: View {
     let layout: ContentViewLayout
     let advancedWindowID: String?
+    let onOpenAdvancedWindow: (() -> Void)?
 
     @EnvironmentObject var audioEngine: AudioEngine
     @EnvironmentObject var eqModel: EQModel
+    @EnvironmentObject var updateChecker: UpdateChecker
     @Environment(\.openWindow) private var openWindow
     @StateObject private var deviceManager = AudioDeviceManager()
     @StateObject private var presetManager = PresetManager()
@@ -48,9 +50,10 @@ struct ContentView: View {
         layout == .compact
     }
 
-    init(layout: ContentViewLayout = .full, advancedWindowID: String? = nil) {
+    init(layout: ContentViewLayout = .full, advancedWindowID: String? = nil, onOpenAdvancedWindow: (() -> Void)? = nil) {
         self.layout = layout
         self.advancedWindowID = advancedWindowID
+        self.onOpenAdvancedWindow = onOpenAdvancedWindow
     }
 
     var body: some View {
@@ -102,6 +105,7 @@ struct ContentView: View {
             syncEQToEngine()
             if !didInitialStartup {
                 autoSelectDevicesAndStart()
+                updateChecker.startPeriodicChecks()
                 didInitialStartup = true
             }
         }
@@ -249,7 +253,7 @@ struct ContentView: View {
             Text("SoundMaxx EQ")
                 .font(.title3.weight(.semibold))
 
-            Text("Designed and built by Bill Rimell")
+            Text("by Bill Rimell")
                 .font(.caption.weight(.semibold))
                 .foregroundColor(.primary.opacity(0.8))
                 .padding(.horizontal, 8)
@@ -305,34 +309,65 @@ struct ContentView: View {
     }
 
     private var helpView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Quick Help")
-                .font(.headline)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Quick Help")
+                    .font(.headline)
 
-            Divider()
+                Divider()
 
-            Group {
-                helpRow(icon: "slider.vertical.3", title: "EQ Sliders", desc: "Drag each band up/down to shape tone (±12 dB).")
-                helpRow(icon: "arrow.up.and.down.circle", title: "Gain Staging", desc: "Headroom is pre-EQ safety (-12 to 0 dB). Volume is post-EQ loudness (-40 to +40 dB).")
-                helpRow(icon: "power", title: "Audio + EQ Toggles", desc: "Audio bypasses the full chain. EQ bypasses filters only for quick A/B checks.")
-                helpRow(icon: "waveform.path.ecg", title: "Clipping + Limiter", desc: "Watch EQ-stage clipping, limiter activity, and final output status.")
-                helpRow(icon: "speaker.wave.2", title: "HDMI Volume", desc: "Software volume appears for outputs without hardware volume control.")
-                helpRow(icon: "square.and.arrow.down", title: "Presets + Import", desc: "Use built-in/custom presets, or import AutoEQ ParametricEQ.txt / GraphicEQ.txt files.")
-                helpRow(icon: "headphones", title: "AutoEQ", desc: "Search and apply headphone correction curves from AutoEQ.")
-                helpRow(icon: "hifispeaker", title: "Device Profiles", desc: "Save EQ per output device. Profiles auto-restore and can auto-save tweaks.")
-                helpRow(icon: "keyboard", title: "Output Shortcut", desc: "Control+Option+Command+O cycles selected shortcut targets.")
-            }
+                Group {
+                    helpRow(icon: "slider.vertical.3", title: "EQ Sliders", desc: "Drag each band up/down to shape tone (±12 dB).")
+                    helpRow(icon: "arrow.up.and.down.circle", title: "Gain Staging", desc: "Headroom is pre-EQ safety (-12 to 0 dB). Volume is post-EQ loudness (-40 to +40 dB).")
+                    helpRow(icon: "power", title: "Audio + EQ Toggles", desc: "Audio bypasses the full chain. EQ bypasses filters only for quick A/B checks.")
+                    helpRow(icon: "waveform.path.ecg", title: "Clipping + Limiter", desc: "Watch EQ-stage clipping, limiter activity, and final output status.")
+                    helpRow(icon: "speaker.wave.2", title: "HDMI Volume", desc: "Software volume appears for outputs without hardware volume control.")
+                    helpRow(icon: "square.and.arrow.down", title: "Presets + Import", desc: "Use built-in/custom presets, or import AutoEQ ParametricEQ.txt / GraphicEQ.txt files.")
+                    helpRow(icon: "headphones", title: "AutoEQ", desc: "Search and apply headphone correction curves from AutoEQ.")
+                    helpRow(icon: "hifispeaker", title: "Device Profiles", desc: "Save EQ per output device. Profiles auto-restore and can auto-save tweaks.")
+                    helpRow(icon: "keyboard", title: "Output Shortcut", desc: "Control+Option+Command+O cycles selected shortcut targets.")
+                }
 
-            Divider()
+                Divider()
 
-            HStack {
+                Text("Latency & Buffer Controls")
+                    .font(.subheadline.weight(.semibold))
+
+                helpRow(icon: "waveform", title: "I/O Buffer (64–4096 frames)", desc: "How often audio is processed per callback. Lower = less latency but more CPU stress. 256 is a good default. Use 512–1024 on slower systems.")
+                helpRow(icon: "circle.grid.3x3", title: "Ring Capacity (1x–16x)", desc: "Total internal buffer space as a multiple of the I/O buffer. Higher = more stability. Lower = tighter latency. Increase this if you hear dropouts when switching apps.")
+                helpRow(icon: "scope", title: "Target Queue (1x–ring capacity)", desc: "How full the ring buffer is allowed to grow before older frames are trimmed. Lower = more aggressive trimming (less latency, more dropout risk). Higher = smoother but more delay.")
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Recommended settings:")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+                    Text("Balanced: I/O 256, Ring 4x, Target 2x")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Low Latency: I/O 64–128, Ring 2–4x, Target 1–2x")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Stable: I/O 512–1024, Ring 6–8x, Target 3–4x")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Crackles → increase I/O buffer or ring capacity. Delay → decrease target queue. HDMI/Bluetooth usually needs higher buffer sizes.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(8)
+                .background(Color.secondary.opacity(0.08))
+                .cornerRadius(6)
+
+                Divider()
+
                 Text("Tip: Set macOS output to BlackHole 2ch, then choose your real output in SoundMaxx.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+            .padding()
         }
-        .padding()
-        .frame(width: 340)
+        .frame(width: 360, height: 520)
     }
 
     private func helpRow(icon: String, title: String, desc: String) -> some View {
@@ -1019,28 +1054,37 @@ struct ContentView: View {
                 .help("Refresh output devices")
             }
 
-            HStack {
-                Text("Shortcut")
-                    .foregroundColor(.secondary)
-                    .frame(width: 50, alignment: .leading)
+            Divider()
 
-                Button {
-                    cycleToNextOutputDevice()
-                } label: {
-                    Label("Switch Output", systemImage: "keyboard")
-                }
-                .buttonStyle(.borderless)
-                .help("Switch to next selected output device")
-
-                shortcutTargetsMenu
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("Control+Option+Command+O")
-                        .font(.caption)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text("Shortcut")
                         .foregroundColor(.secondary)
+                        .frame(width: 60, alignment: .leading)
 
+                    Button {
+                        cycleToNextOutputDevice()
+                    } label: {
+                        Label("Switch Output", systemImage: "keyboard")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Switch to next selected output device")
+
+                    shortcutTargetsMenu
+
+                    Spacer()
+
+                    Text("⌃⌥⌘O")
+                        .font(.caption.weight(.medium))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
+                }
+
+                HStack {
+                    Spacer().frame(width: 68)
                     Text(shortcutTargetsSummary)
                         .font(.caption2)
                         .foregroundColor(.secondary)
@@ -1054,34 +1098,36 @@ struct ContentView: View {
 
             latencyControls
 
-            HStack {
+            HStack(spacing: 8) {
                 Button {
                     exportSettingsBackup()
                 } label: {
                     Label("Export Settings", systemImage: "square.and.arrow.up")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
                 .help("Export app settings, custom presets, and device profiles to a JSON backup")
-
-                Spacer()
 
                 Button {
                     importSettingsBackup()
                 } label: {
                     Label("Import Settings", systemImage: "square.and.arrow.down")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
                 .help("Import a SoundMaxx JSON backup and apply it immediately")
+
+                Spacer()
             }
 
         }
     }
 
     private var deviceProfileControls: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             HStack {
                 if eqModel.hasDeviceProfile {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
                             .font(.caption)
@@ -1102,7 +1148,7 @@ struct ContentView: View {
                     .foregroundColor(.red)
                     .help("Delete device profile")
                 } else {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         Image(systemName: "circle.dashed")
                             .foregroundColor(.secondary)
                             .font(.caption)
@@ -1119,38 +1165,40 @@ struct ContentView: View {
                         Text("Save Profile")
                             .font(.caption)
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                     .help("Save EQ settings for this device")
                 }
             }
 
-            HStack {
-                Toggle(
-                    "Auto-save profile changes",
-                    isOn: Binding(
-                        get: { eqModel.autoSaveEnabled },
-                        set: { eqModel.setAutoSaveEnabled($0) }
-                    )
+            Toggle(
+                "Auto-save profile changes",
+                isOn: Binding(
+                    get: { eqModel.autoSaveEnabled },
+                    set: { eqModel.setAutoSaveEnabled($0) }
                 )
-                .toggleStyle(.checkbox)
-                .font(.caption)
-                .help("Automatically update this device profile as you tweak EQ settings")
-
-                Spacer()
-            }
+            )
+            .toggleStyle(.checkbox)
+            .font(.caption)
+            .help("Automatically update this device profile as you tweak EQ settings")
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.06))
+        .cornerRadius(8)
     }
 
     private var latencyControls: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Latency")
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Latency & Buffering")
                 .font(.caption.weight(.semibold))
                 .foregroundColor(.secondary)
 
             HStack {
                 Text("I/O Buffer")
+                    .font(.caption)
                     .foregroundColor(.secondary)
-                    .frame(width: 110, alignment: .leading)
+                    .frame(width: 100, alignment: .leading)
 
                 Picker(
                     "",
@@ -1168,12 +1216,14 @@ struct ContentView: View {
 
             HStack {
                 Text("Ring Capacity")
+                    .font(.caption)
                     .foregroundColor(.secondary)
-                    .frame(width: 110, alignment: .leading)
+                    .frame(width: 100, alignment: .leading)
 
                 Stepper(value: $ringBufferCapacityMultiplier, in: 1...16) {
                     Text("\(ringBufferCapacityMultiplier)x")
-                        .frame(width: 50, alignment: .leading)
+                        .font(.caption)
+                        .frame(width: 40, alignment: .leading)
                 }
                 .help("Total buffering available before overflow. Lower reduces latency growth.")
 
@@ -1182,12 +1232,14 @@ struct ContentView: View {
 
             HStack {
                 Text("Target Queue")
+                    .font(.caption)
                     .foregroundColor(.secondary)
-                    .frame(width: 110, alignment: .leading)
+                    .frame(width: 100, alignment: .leading)
 
                 Stepper(value: $latencyTargetMultiplier, in: 1...ringBufferCapacityMultiplier) {
                     Text("\(latencyTargetMultiplier)x")
-                        .frame(width: 50, alignment: .leading)
+                        .font(.caption)
+                        .frame(width: 40, alignment: .leading)
                 }
                 .help("Keeps queue near this depth by dropping older buffered frames to avoid A/V drift.")
 
@@ -1198,6 +1250,10 @@ struct ContentView: View {
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.06))
+        .cornerRadius(8)
     }
 
     private var footer: some View {
@@ -1210,6 +1266,10 @@ struct ContentView: View {
                 }
             }
 
+            if case .updateAvailable(let version, let dmgURL) = updateChecker.state {
+                updateBanner(version: version, dmgURL: dmgURL)
+            }
+
             if let error = audioEngine.errorMessage {
                 Text(error)
                     .font(.caption)
@@ -1219,8 +1279,51 @@ struct ContentView: View {
         }
     }
 
+    private func updateBanner(version: String, dmgURL: URL) -> some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .foregroundColor(.accentColor)
+                Text("v\(version) available")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                updateBannerAction(dmgURL: dmgURL)
+            }
+            if case .downloading(let progress) = updateChecker.downloadState {
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .animation(.linear, value: progress)
+            }
+        }
+        .padding(8)
+        .background(Color.accentColor.opacity(0.08))
+        .cornerRadius(8)
+    }
+
+    @ViewBuilder
+    private func updateBannerAction(dmgURL: URL) -> some View {
+        switch updateChecker.downloadState {
+        case .idle, .failed:
+            Button(updateChecker.downloadState == .failed ? "Retry" : "Download & Install") {
+                updateChecker.downloadAndInstall(from: dmgURL)
+            }
+            .font(.caption)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        case .downloading(let progress):
+            Text("\(Int(progress * 100))%")
+                .font(.caption.monospacedDigit())
+                .foregroundColor(.secondary)
+        case .openingInstaller:
+            Text("Opening installer…")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+
     private var fullFooter: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             HStack {
                 Toggle("Launch at Login", isOn: $launchAtLogin.isEnabled)
                     .font(.caption)
@@ -1228,17 +1331,17 @@ struct ContentView: View {
                     .help("Automatically start SoundMaxx when you log in")
 
                 Spacer()
+
+                statusIndicator
             }
 
-            HStack {
-                statusIndicator
-
-                Spacer()
-
+            HStack(spacing: 5) {
                 Button("Reset") {
                     eqModel.reset()
                 }
                 .help("Reset all EQ bands to 0dB (flat)")
+
+                Divider().frame(height: 18)
 
                 Button("Undo") {
                     eqModel.undo()
@@ -1253,6 +1356,8 @@ struct ContentView: View {
                 .disabled(!eqModel.canRedo)
                 .keyboardShortcut("z", modifiers: [.command, .shift])
                 .help("Redo last undone EQ change")
+
+                Divider().frame(height: 18)
 
                 Button("Save A") {
                     eqModel.saveCompareSnapshotA()
@@ -1275,6 +1380,8 @@ struct ContentView: View {
                 }
                 .disabled(!eqModel.hasCompareB)
                 .help("Load compare slot B")
+
+                Spacer()
 
                 Button(audioEngine.isRunning ? "Stop" : "Start") {
                     if audioEngine.isRunning {
@@ -1347,7 +1454,7 @@ struct ContentView: View {
                 Button("Advanced Options") {
                     openAdvancedWindow()
                 }
-                .disabled(advancedWindowID == nil)
+                .disabled(advancedWindowID == nil && onOpenAdvancedWindow == nil)
 
                 Spacer()
 
@@ -1470,8 +1577,12 @@ struct ContentView: View {
     }
 
     private func openAdvancedWindow() {
+        if let onOpenAdvancedWindow {
+            onOpenAdvancedWindow()
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
         guard let windowID = advancedWindowID else { return }
-
         openWindow(id: windowID)
         NSApp.activate(ignoringOtherApps: true)
     }

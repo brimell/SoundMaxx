@@ -5,41 +5,32 @@ import Carbon.HIToolbox
 
 @main
 struct SoundMaxxApp: App {
-    private static let mainWindowID = "main-window"
-
     @StateObject private var audioEngine: AudioEngine
     @StateObject private var eqModel: EQModel
+    @StateObject private var updateChecker: UpdateChecker
     private let outputSwitchShortcutManager: OutputSwitchShortcutManager
+    private let trayController: TrayController
 
     init() {
         let engine = AudioEngine()
         let model = EQModel()
+        let checker = UpdateChecker()
         let shortcutManager = OutputSwitchShortcutManager {
             Self.cycleToNextOutputDevice(audioEngine: engine)
         }
 
         _audioEngine = StateObject(wrappedValue: engine)
         _eqModel = StateObject(wrappedValue: model)
+        _updateChecker = StateObject(wrappedValue: checker)
         outputSwitchShortcutManager = shortcutManager
+        trayController = TrayController(audioEngine: engine, eqModel: model, updateChecker: checker)
 
         Self.configureEngineCallbacks(audioEngine: engine, eqModel: model)
         Self.requestMicrophonePermissionAndStart(audioEngine: engine, eqModel: model)
     }
 
     var body: some Scene {
-        MenuBarExtra("SoundMaxx", systemImage: "slider.horizontal.3") {
-            ContentView(layout: .compact, advancedWindowID: Self.mainWindowID)
-                .environmentObject(audioEngine)
-                .environmentObject(eqModel)
-        }
-        .menuBarExtraStyle(.window)
-
-        Window("SoundMaxx Advanced", id: Self.mainWindowID) {
-            ContentView(layout: .full)
-                .environmentObject(audioEngine)
-                .environmentObject(eqModel)
-        }
-        .defaultSize(width: 900, height: 920)
+        Settings { EmptyView() }
     }
 
     private static func requestMicrophonePermissionAndStart(audioEngine: AudioEngine, eqModel: EQModel) {

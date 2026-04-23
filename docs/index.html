@@ -422,7 +422,71 @@
                     <h3>Shortcut Target Sets</h3>
                     <p>Use Control+Option+Command+O to switch outputs, and choose exactly which devices are in the cycle list.</p>
                 </article>
+                <article class="feature-card">
+                    <h3>Latency &amp; Buffer Controls</h3>
+                    <p>Tune I/O buffer size, ring buffer capacity, and target queue depth to balance audio latency against stability on your specific hardware.</p>
+                </article>
+                <article class="feature-card">
+                    <h3>Undo / Redo + A/B Compare</h3>
+                    <p>Full undo/redo history for EQ changes, plus two compare snapshot slots to instantly flip between different tunings.</p>
+                </article>
+                <article class="feature-card">
+                    <h3>Settings Backup</h3>
+                    <p>Export all settings, custom presets, and device profiles to a JSON file and import them on any machine.</p>
+                </article>
             </div>
+        </section>
+
+        <section class="section" aria-labelledby="latency">
+            <h2 class="section-title" id="latency">Latency &amp; Buffer Controls</h2>
+            <p class="muted" style="margin-bottom: 1rem;">SoundMaxx uses a three-stage buffering pipeline. Tune it to match your hardware.</p>
+            <div class="feature-grid">
+                <article class="feature-card">
+                    <h3>I/O Buffer (64–4096 frames)</h3>
+                    <p>Controls how often audio is processed per hardware callback. Lower values reduce latency but increase CPU load. 256 frames is a good starting point for most systems.</p>
+                </article>
+                <article class="feature-card">
+                    <h3>Ring Capacity (1×–16×)</h3>
+                    <p>Total internal buffer space as a multiple of the I/O buffer. Higher values absorb timing differences between input and output and prevent dropouts when devices drift.</p>
+                </article>
+                <article class="feature-card">
+                    <h3>Target Queue (1×–ring capacity)</h3>
+                    <p>Keeps the ring buffer near a set depth by trimming older frames. Lower values mean more aggressive trimming — less latency but higher dropout risk.</p>
+                </article>
+            </div>
+            <div style="margin-top: 1rem; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md);">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Profile</th>
+                            <th>I/O Buffer</th>
+                            <th>Ring Capacity</th>
+                            <th>Target Queue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Balanced (default)</strong></td>
+                            <td>256 frames</td>
+                            <td>4×</td>
+                            <td>2×</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Low Latency</strong></td>
+                            <td>64–128 frames</td>
+                            <td>2–4×</td>
+                            <td>1–2×</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Maximum Stability</strong></td>
+                            <td>512–1024 frames</td>
+                            <td>6–8×</td>
+                            <td>3–4×</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="muted" style="margin-top: 0.75rem; font-size: 0.9rem;">HDMI and Bluetooth outputs usually need higher buffer values. Changing any setting briefly restarts the audio engine.</p>
         </section>
 
         <section class="section" aria-labelledby="screenshots">
