@@ -366,7 +366,7 @@ class AudioEngine: ObservableObject {
                             workingSampleRate = rate
                             break
                         }
-          j          }
+                    }
                 }
             }
 
