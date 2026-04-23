@@ -68,6 +68,10 @@ class EQModel: ObservableObject {
     private var lastHistoryContextTime: TimeInterval = 0
     private let historyMergeWindow: TimeInterval = 0.35
     private let maxHistoryDepth = 180
+    private var pendingSettingsPersist = false
+    private var pendingProfilePersist = false
+    private var persistWorkItem: DispatchWorkItem?
+    private let persistenceDebounceInterval: TimeInterval = 0.12
 
     private static func clampPreGain(_ value: Float) -> Float {
         min(max(value, preGainRange.lowerBound), preGainRange.upperBound)
@@ -84,82 +88,77 @@ class EQModel: ObservableObject {
         $parametricBands
             .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
             .sink { [weak self] _ in
-                self?.saveSettings()
-                self?.autoSaveToDeviceProfile()
+                self?.schedulePersistence(settings: true, profile: true)
             }
             .store(in: &cancellables)
 
         $isEnabled
             .sink { [weak self] _ in
-                self?.saveSettings()
-                self?.autoSaveToDeviceProfile()
+                self?.schedulePersistence(settings: true, profile: true)
             }
             .store(in: &cancellables)
 
         $isEQFiltersEnabled
             .sink { [weak self] _ in
-                self?.saveSettings()
-                self?.autoSaveToDeviceProfile()
+                self?.schedulePersistence(settings: true, profile: true)
             }
             .store(in: &cancellables)
 
         $preGain
             .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
             .sink { [weak self] _ in
-                self?.saveSettings()
-                self?.autoSaveToDeviceProfile()
+                self?.schedulePersistence(settings: true, profile: true)
             }
             .store(in: &cancellables)
 
         $outputGain
             .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
             .sink { [weak self] _ in
-                self?.saveSettings()
-                self?.autoSaveToDeviceProfile()
+                self?.schedulePersistence(settings: true, profile: true)
             }
             .store(in: &cancellables)
 
         $limiterEnabled
             .sink { [weak self] _ in
-                self?.saveSettings()
-                self?.autoSaveToDeviceProfile()
+                self?.schedulePersistence(settings: true, profile: true)
             }
             .store(in: &cancellables)
 
         $limiterCeilingDB
             .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
             .sink { [weak self] _ in
-                self?.saveSettings()
-                self?.autoSaveToDeviceProfile()
+                self?.schedulePersistence(settings: true, profile: true)
             }
             .store(in: &cancellables)
 
         $autoStopClippingEnabled
             .sink { [weak self] _ in
-                self?.saveSettings()
-                self?.autoSaveToDeviceProfile()
+                self?.schedulePersistence(settings: true, profile: true)
             }
             .store(in: &cancellables)
 
         $volume
             .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
             .sink { [weak self] _ in
-                self?.saveSettings()
-                self?.autoSaveToDeviceProfile()
+                self?.schedulePersistence(settings: true, profile: true)
             }
             .store(in: &cancellables)
 
         $usePerDeviceVolume
             .sink { [weak self] _ in
-                self?.saveSettings()
+                self?.schedulePersistence(settings: true)
             }
             .store(in: &cancellables)
 
         $autoSaveEnabled
             .sink { [weak self] _ in
-                self?.saveSettings()
+                self?.schedulePersistence(settings: true)
             }
             .store(in: &cancellables)
+    }
+
+    deinit {
+        persistWorkItem?.cancel()
     }
 
     // MARK: - Device Profile Management
@@ -633,6 +632,38 @@ class EQModel: ObservableObject {
     private func updateHistoryAvailability() {
         canUndo = !undoHistory.isEmpty
         canRedo = !redoHistory.isEmpty
+    }
+
+    private func schedulePersistence(settings: Bool = false, profile: Bool = false) {
+        guard settings || profile else { return }
+
+        if settings {
+            pendingSettingsPersist = true
+        }
+        if profile {
+            pendingProfilePersist = true
+        }
+
+        persistWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+
+            let shouldPersistSettings = self.pendingSettingsPersist
+            let shouldPersistProfile = self.pendingProfilePersist
+            self.pendingSettingsPersist = false
+            self.pendingProfilePersist = false
+
+            if shouldPersistSettings {
+                self.saveSettings()
+            }
+            if shouldPersistProfile {
+                self.autoSaveToDeviceProfile()
+            }
+        }
+
+        persistWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + persistenceDebounceInterval, execute: workItem)
     }
 
     private func saveSettings() {
