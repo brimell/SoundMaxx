@@ -174,6 +174,8 @@ final class TrayController: NSObject {
             )
             window.title = "SoundMaxx Advanced"
             window.contentViewController = controller
+            window.minSize = NSSize(width: 700, height: 620)
+            window.setFrameAutosaveName("SoundMaxxAdvancedWindow")
             window.center()
             advancedWindow = window
         }

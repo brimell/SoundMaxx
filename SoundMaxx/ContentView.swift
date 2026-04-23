@@ -42,9 +42,7 @@ struct ContentView: View {
     private let settingsStore = AppSettingsStore.shared
     private let autoEQManager = AutoEQManager.shared
 
-    private var menuWidth: CGFloat {
-        isCompactLayout ? 640 : 800
-    }
+    private let compactMenuWidth: CGFloat = 640
 
     private var isCompactLayout: Bool {
         layout == .compact
@@ -57,44 +55,13 @@ struct ContentView: View {
     }
 
     var body: some View {
-        VStack(spacing: isCompactLayout ? 12 : 16) {
-            header
-
-            Divider()
-
-            responseGraph
-
-            spectrumGraph
-
-            eqSliders
-
-            preGainControl
-
-            // Volume slider for HDMI/devices without hardware volume
-            if audioEngine.outputDeviceNeedsVolumeControl {
-                volumeControl
-            }
-
+        Group {
             if isCompactLayout {
-                compactOutputControl
+                compactLayoutBody
+            } else {
+                advancedLayoutBody
             }
-
-            if !isCompactLayout {
-                Divider()
-
-                presetControls
-
-                Divider()
-
-                deviceControls
-
-                Divider()
-            }
-
-            footer
         }
-        .padding(isCompactLayout ? 14 : 18)
-        .frame(width: menuWidth)
         .font(.system(size: 14))
         .onAppear {
             loadShortcutOutputTargets()
@@ -192,6 +159,60 @@ struct ContentView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(settingsTransferMessage)
+        }
+    }
+
+    private var compactLayoutBody: some View {
+        mainContent
+            .padding(14)
+            .frame(width: compactMenuWidth)
+    }
+
+    private var advancedLayoutBody: some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            mainContent
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .frame(minWidth: 700, minHeight: 620)
+    }
+
+    private var mainContent: some View {
+        VStack(spacing: isCompactLayout ? 12 : 16) {
+            header
+
+            Divider()
+
+            responseGraph
+
+            spectrumGraph
+
+            eqSliders
+
+            preGainControl
+
+            // Volume slider for HDMI/devices without hardware volume
+            if audioEngine.outputDeviceNeedsVolumeControl {
+                volumeControl
+            }
+
+            if isCompactLayout {
+                compactOutputControl
+            }
+
+            if !isCompactLayout {
+                Divider()
+
+                presetControls
+
+                Divider()
+
+                deviceControls
+
+                Divider()
+            }
+
+            footer
         }
     }
 
