@@ -85,16 +85,20 @@ class AudioEngine: ObservableObject {
     var onPreGainAutoAdjusted: ((Float) -> Void)?
 
     private var hardwareDevicesChangedListener: AudioObjectPropertyListenerBlock?
+    private var defaultOutputDeviceChangedListener: AudioObjectPropertyListenerBlock?
 
     static let bandFrequencies: [Float] = EQBand.defaultFrequencies
     static let microphoneAccessDeniedMessage = "Microphone access is denied. SoundMaxx needs microphone permission to capture audio input. Enable it in System Settings > Privacy & Security > Microphone, then restart SoundMaxx."
 
     init() {
         registerHardwareDeviceListener()
+        registerDefaultOutputDeviceListener()
+        enforceBlackHoleAsDefaultOutput()
     }
 
     deinit {
         unregisterHardwareDeviceListener()
+        unregisterDefaultOutputDeviceListener()
     }
 
     var preferredIOBufferFrames: UInt32 {
@@ -290,6 +294,104 @@ class AudioEngine: ObservableObject {
         )
 
         hardwareDevicesChangedListener = nil
+    }
+
+    private func registerDefaultOutputDeviceListener() {
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                self.enforceBlackHoleAsDefaultOutput()
+            }
+        }
+
+        let status = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            DispatchQueue.global(qos: .userInitiated),
+            listener
+        )
+
+        guard status == noErr else {
+            print("Failed to register default output listener (status: \(status))")
+            return
+        }
+
+        defaultOutputDeviceChangedListener = listener
+    }
+
+    private func unregisterDefaultOutputDeviceListener() {
+        guard let listener = defaultOutputDeviceChangedListener else { return }
+
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        AudioObjectRemovePropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            DispatchQueue.global(qos: .userInitiated),
+            listener
+        )
+
+        defaultOutputDeviceChangedListener = nil
+    }
+
+    private func enforceBlackHoleAsDefaultOutput() {
+        let deviceManager = AudioDeviceManager()
+        guard let blackHoleOutput = deviceManager.outputDevices.first(where: { $0.name.lowercased().contains("blackhole") }) else {
+            return
+        }
+
+        if let currentDefaultOutput = deviceManager.getDefaultOutputDevice(),
+           currentDefaultOutput == blackHoleOutput.id {
+            return
+        }
+
+        _ = setSystemDefaultOutputDevice(blackHoleOutput.id)
+    }
+
+    @discardableResult
+    private func setSystemDefaultOutputDevice(_ deviceID: AudioDeviceID) -> Bool {
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var writable: DarwinBoolean = false
+        let writableStatus = AudioObjectIsPropertySettable(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            &writable
+        )
+
+        guard writableStatus == noErr, writable.boolValue else {
+            return false
+        }
+
+        var updatedDeviceID = deviceID
+        let status = AudioObjectSetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            UInt32(MemoryLayout<AudioDeviceID>.size),
+            &updatedDeviceID
+        )
+
+        if status != noErr {
+            print("Failed to set default output to BlackHole (status: \(status))")
+        }
+
+        return status == noErr
     }
 
     private func handleOutputDeviceListChanged() {
