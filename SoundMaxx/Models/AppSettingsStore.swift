@@ -107,6 +107,7 @@ class AppSettingsStore {
 
     private let settingsKey = "SoundMaxx.AppSettings"
     private var cachedSettings: AppSettings?
+    private var cachedEncodedSettings: Data?
 
     init() {
         loadFromDefaults()
@@ -147,6 +148,7 @@ class AppSettingsStore {
             return nil
         }
         cachedSettings = decoded
+        cachedEncodedSettings = data
         return decoded
     }
 
@@ -155,6 +157,19 @@ class AppSettingsStore {
             print("Failed to encode app settings")
             return
         }
+
+        if let cachedEncodedSettings, cachedEncodedSettings == data {
+            return
+        }
+
+        if cachedEncodedSettings == nil,
+           let storedData = UserDefaults.standard.data(forKey: settingsKey),
+           storedData == data {
+            cachedEncodedSettings = storedData
+            return
+        }
+
+        cachedEncodedSettings = data
         UserDefaults.standard.set(data, forKey: settingsKey)
     }
 }

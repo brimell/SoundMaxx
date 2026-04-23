@@ -123,6 +123,7 @@ class DeviceProfileManager: ObservableObject {
     @Published private(set) var profiles: [String: DeviceProfile] = [:]
 
     private let profilesKey = "SoundMaxx.DeviceProfiles"
+    private var cachedEncodedProfiles: Data?
 
     init() {
         loadProfiles()
@@ -200,10 +201,24 @@ class DeviceProfileManager: ObservableObject {
             return
         }
         profiles = decoded
+        cachedEncodedProfiles = data
     }
 
     private func persistProfiles() {
         guard let data = try? JSONEncoder().encode(profiles) else { return }
+
+        if let cachedEncodedProfiles, cachedEncodedProfiles == data {
+            return
+        }
+
+        if cachedEncodedProfiles == nil,
+           let storedData = UserDefaults.standard.data(forKey: profilesKey),
+           storedData == data {
+            cachedEncodedProfiles = storedData
+            return
+        }
+
+        cachedEncodedProfiles = data
         UserDefaults.standard.set(data, forKey: profilesKey)
     }
 }
