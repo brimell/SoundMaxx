@@ -5,6 +5,11 @@ import AudioToolbox
 import Accelerate
 
 class AudioEngine: ObservableObject {
+    static let supportedIOBufferFrames: [UInt32] = [64, 128, 256, 512, 1024, 2048, 4096]
+    static let defaultIOBufferFrames: UInt32 = 256
+    static let defaultRingBufferCapacityMultiplier: UInt32 = 4
+    static let defaultLatencyTargetMultiplier: UInt32 = 2
+
     private var inputUnit: AudioUnit?
     private var outputUnit: AudioUnit?
     private var parametricEQ: ParametricEQ?
@@ -14,7 +19,9 @@ class AudioEngine: ObservableObject {
 
     private var ringBuffer: RingBuffer?
     private var outputLimiter: OutputLimiter?
-    private let bufferSize: UInt32 = 4096
+    private var requestedIOBufferFrames: UInt32 = AudioEngine.defaultIOBufferFrames
+    private var ringBufferCapacityMultiplier: UInt32 = AudioEngine.defaultRingBufferCapacityMultiplier
+    private var latencyTargetMultiplier: UInt32 = AudioEngine.defaultLatencyTargetMultiplier
     private var currentBands: [EQBand] = EQBand.defaultTenBand
     private var currentBypassState = false
     private var currentEQFiltersEnabled = true
@@ -24,6 +31,9 @@ class AudioEngine: ObservableObject {
     @Published var selectedOutputDeviceID: AudioDeviceID?
     @Published var errorMessage: String?
     @Published private(set) var processingSampleRate: Double = 48000
+    @Published private(set) var effectiveInputBufferFrames: UInt32 = AudioEngine.defaultIOBufferFrames
+    @Published private(set) var effectiveOutputBufferFrames: UInt32 = AudioEngine.defaultIOBufferFrames
+    @Published private(set) var effectiveRingBufferCapacityFrames: UInt32 = AudioEngine.defaultIOBufferFrames * AudioEngine.defaultRingBufferCapacityMultiplier
 
     // Software volume control (0.0 to 1.0)
     @Published var softwareVolume: Float = 1.0
@@ -74,10 +84,56 @@ class AudioEngine: ObservableObject {
     var onOutputDeviceChanged: ((AudioDeviceID, String, String) -> Void)?
     var onPreGainAutoAdjusted: ((Float) -> Void)?
 
+    private var hardwareDevicesChangedListener: AudioObjectPropertyListenerBlock?
+
     static let bandFrequencies: [Float] = EQBand.defaultFrequencies
     static let microphoneAccessDeniedMessage = "Microphone access is denied. SoundMaxx needs microphone permission to capture audio input. Enable it in System Settings > Privacy & Security > Microphone, then restart SoundMaxx."
 
-    init() {}
+    init() {
+        registerHardwareDeviceListener()
+    }
+
+    deinit {
+        unregisterHardwareDeviceListener()
+    }
+
+    var preferredIOBufferFrames: UInt32 {
+        requestedIOBufferFrames
+    }
+
+    var preferredRingBufferCapacityMultiplier: UInt32 {
+        ringBufferCapacityMultiplier
+    }
+
+    var preferredLatencyTargetMultiplier: UInt32 {
+        latencyTargetMultiplier
+    }
+
+    func updateLatencySettings(ioBufferFrames: UInt32, ringCapacityMultiplier: UInt32, latencyTargetMultiplier: UInt32) {
+        let clampedFrames = Self.clampIOBufferFrames(ioBufferFrames)
+        let clampedRingMultiplier = max(1, min(ringCapacityMultiplier, 16))
+        let clampedLatencyTargetMultiplier = max(1, min(latencyTargetMultiplier, clampedRingMultiplier))
+
+        let hasChanges =
+            requestedIOBufferFrames != clampedFrames ||
+            ringBufferCapacityMultiplier != clampedRingMultiplier ||
+            self.latencyTargetMultiplier != clampedLatencyTargetMultiplier
+
+        requestedIOBufferFrames = clampedFrames
+        ringBufferCapacityMultiplier = clampedRingMultiplier
+        self.latencyTargetMultiplier = clampedLatencyTargetMultiplier
+
+        guard hasChanges, isRunning else { return }
+        stop()
+        start()
+    }
+
+    private static func clampIOBufferFrames(_ value: UInt32) -> UInt32 {
+        if supportedIOBufferFrames.contains(value) {
+            return value
+        }
+        return supportedIOBufferFrames.min(by: { abs(Int64($0) - Int64(value)) < abs(Int64($1) - Int64(value)) }) ?? defaultIOBufferFrames
+    }
 
     func setVolume(_ volume: Float) {
         softwareVolume = max(0.0, min(1.0, volume))
@@ -188,6 +244,84 @@ class AudioEngine: ObservableObject {
         return deviceName as String
     }
 
+    private func registerHardwareDeviceListener() {
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                self.handleOutputDeviceListChanged()
+            }
+        }
+
+        let status = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            DispatchQueue.global(qos: .userInitiated),
+            listener
+        )
+
+        guard status == noErr else {
+            print("Failed to register hardware device listener (status: \(status))")
+            return
+        }
+
+        hardwareDevicesChangedListener = listener
+    }
+
+    private func unregisterHardwareDeviceListener() {
+        guard let listener = hardwareDevicesChangedListener else { return }
+
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        AudioObjectRemovePropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            DispatchQueue.global(qos: .userInitiated),
+            listener
+        )
+
+        hardwareDevicesChangedListener = nil
+    }
+
+    private func handleOutputDeviceListChanged() {
+        guard let selectedOutputDeviceID else { return }
+
+        let deviceManager = AudioDeviceManager()
+        let outputStillConnected = deviceManager.outputDevices.contains { $0.id == selectedOutputDeviceID }
+        guard !outputStillConnected else { return }
+
+        let preferredUIDs = AppSettingsStore.shared.load()?.shortcutOutputDeviceUIDs
+        let fallbackDevice = deviceManager.nextOutputDevice(
+            after: selectedOutputDeviceID,
+            preferredUIDs: preferredUIDs
+        )
+
+        if let fallbackDevice {
+            setOutputDevice(fallbackDevice.id)
+            AppSettingsStore.shared.update { settings in
+                settings.selectedOutputDeviceID = Int32(fallbackDevice.id)
+            }
+            return
+        }
+
+        if let defaultOutputDeviceID = deviceManager.getDefaultOutputDevice(),
+           deviceManager.outputDevices.contains(where: { $0.id == defaultOutputDeviceID }) {
+            setOutputDevice(defaultOutputDeviceID)
+            AppSettingsStore.shared.update { settings in
+                settings.selectedOutputDeviceID = Int32(defaultOutputDeviceID)
+            }
+        }
+    }
+
     func start() {
         guard !isRunning else { return }
 
@@ -232,7 +366,7 @@ class AudioEngine: ObservableObject {
                             workingSampleRate = rate
                             break
                         }
-                    }
+          j          }
                 }
             }
 
@@ -252,9 +386,19 @@ class AudioEngine: ObservableObject {
             processingSampleRate = workingSampleRate
             setupSpectrumAnalyzer(sampleRate: Float(workingSampleRate))
 
-            // Initialize ring buffer
-            ringBuffer = RingBuffer(channels: 2, bytesPerFrame: 8, capacityFrames: bufferSize * 4)
-            prepareInputRenderBuffers(frameCapacity: bufferSize)
+            let desiredBufferFrames = requestedIOBufferFrames
+            let inputBufferFrames = setDeviceBufferFrameSize(deviceID: inputDeviceID, requestedFrames: desiredBufferFrames) ?? desiredBufferFrames
+            let outputBufferFrames = setDeviceBufferFrameSize(deviceID: outputDeviceID, requestedFrames: desiredBufferFrames) ?? desiredBufferFrames
+            effectiveInputBufferFrames = inputBufferFrames
+            effectiveOutputBufferFrames = outputBufferFrames
+
+            let callbackFrameCapacity = max(inputBufferFrames, outputBufferFrames)
+            let ringCapacityFrames = max(callbackFrameCapacity * ringBufferCapacityMultiplier, callbackFrameCapacity)
+
+            // Initialize ring buffer.
+            ringBuffer = RingBuffer(channels: 2, bytesPerFrame: 8, capacityFrames: ringCapacityFrames)
+            effectiveRingBufferCapacityFrames = ringCapacityFrames
+            prepareInputRenderBuffers(frameCapacity: callbackFrameCapacity)
             resetClippingMeterState()
 
             // Create input unit (captures from BlackHole)
@@ -350,6 +494,14 @@ class AudioEngine: ObservableObject {
                           userInfo: [NSLocalizedDescriptionKey: "Could not set stream format for input unit"])
         }
 
+        var maxFramesPerSlice = max(effectiveInputBufferFrames, requestedIOBufferFrames)
+        status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_MaximumFramesPerSlice,
+                                      kAudioUnitScope_Global, 0, &maxFramesPerSlice, UInt32(MemoryLayout<UInt32>.size))
+        guard status == noErr else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status),
+                          userInfo: [NSLocalizedDescriptionKey: "Could not set max frames per slice for input unit"])
+        }
+
         // Set input callback
         var callbackStruct = AURenderCallbackStruct(
             inputProc: inputCallback,
@@ -407,6 +559,14 @@ class AudioEngine: ObservableObject {
         guard status == noErr else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(status),
                           userInfo: [NSLocalizedDescriptionKey: "Could not set stream format for output unit"])
+        }
+
+        var maxFramesPerSlice = max(effectiveOutputBufferFrames, requestedIOBufferFrames)
+        status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_MaximumFramesPerSlice,
+                                      kAudioUnitScope_Global, 0, &maxFramesPerSlice, UInt32(MemoryLayout<UInt32>.size))
+        guard status == noErr else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status),
+                          userInfo: [NSLocalizedDescriptionKey: "Could not set max frames per slice for output unit"])
         }
 
         // Set render callback
@@ -507,6 +667,58 @@ class AudioEngine: ObservableObject {
         }
     }
 
+    private func setDeviceBufferFrameSize(deviceID: AudioDeviceID, requestedFrames: UInt32) -> UInt32? {
+        guard let range = getDeviceBufferFrameSizeRange(deviceID: deviceID) else { return nil }
+
+        let minFrames = max(16.0, range.mMinimum)
+        let maxFrames = max(minFrames, range.mMaximum)
+        let clamped = min(max(Double(requestedFrames), minFrames), maxFrames)
+        let roundedRequested = UInt32(clamped.rounded())
+
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyBufferFrameSize,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var isSettable: DarwinBoolean = false
+        let isSettableStatus = AudioObjectIsPropertySettable(deviceID, &propertyAddress, &isSettable)
+        if isSettableStatus == noErr && isSettable.boolValue {
+            var requested = roundedRequested
+            _ = AudioObjectSetPropertyData(
+                deviceID,
+                &propertyAddress,
+                0,
+                nil,
+                UInt32(MemoryLayout<UInt32>.size),
+                &requested
+            )
+        }
+
+        var currentFrames: UInt32 = roundedRequested
+        var dataSize = UInt32(MemoryLayout<UInt32>.size)
+        let readStatus = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, &dataSize, &currentFrames)
+        if readStatus != noErr {
+            return roundedRequested
+        }
+
+        return currentFrames
+    }
+
+    private func getDeviceBufferFrameSizeRange(deviceID: AudioDeviceID) -> AudioValueRange? {
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyBufferFrameSizeRange,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var range = AudioValueRange(mMinimum: 0, mMaximum: 0)
+        var dataSize = UInt32(MemoryLayout<AudioValueRange>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, &dataSize, &range)
+        guard status == noErr else { return nil }
+        return range
+    }
+
     private func prepareInputRenderBuffers(frameCapacity: UInt32) {
         releaseInputRenderBuffers()
 
@@ -603,6 +815,9 @@ class AudioEngine: ObservableObject {
         ioData: UnsafeMutablePointer<AudioBufferList>?
     ) -> OSStatus {
         guard let ioData = ioData, let ringBuffer = ringBuffer else { return noErr }
+
+        let desiredLatencyFrames = max(effectiveOutputBufferFrames * latencyTargetMultiplier, effectiveOutputBufferFrames)
+        ringBuffer.trimBufferedFrames(maxBufferedFrames: desiredLatencyFrames + inNumberFrames)
 
         // Fetch from ring buffer
         let fetched = ringBuffer.fetch(ioData, frameCount: inNumberFrames)
@@ -879,6 +1094,7 @@ class RingBuffer {
     private let channels: UInt32
     private var writeIndex: UInt32 = 0
     private var readIndex: UInt32 = 0
+    private var storedFrames: UInt32 = 0
     private let lock = NSLock()
 
     init(channels: UInt32, bytesPerFrame: UInt32, capacityFrames: UInt32) {
@@ -908,14 +1124,19 @@ class RingBuffer {
         }
 
         writeIndex = (writeIndex + frameCount) % capacityFrames
+        let newStoredFrames = min(storedFrames + frameCount, capacityFrames)
+        if storedFrames + frameCount > capacityFrames {
+            let overflowFrames = (storedFrames + frameCount) - capacityFrames
+            readIndex = (readIndex + overflowFrames) % capacityFrames
+        }
+        storedFrames = newStoredFrames
     }
 
     func fetch(_ bufferList: UnsafeMutablePointer<AudioBufferList>, frameCount: UInt32) -> UInt32 {
         lock.lock()
         defer { lock.unlock() }
 
-        let available = (writeIndex >= readIndex) ? (writeIndex - readIndex) : (capacityFrames - readIndex + writeIndex)
-        let toRead = min(frameCount, available)
+        let toRead = min(frameCount, storedFrames)
 
         let bufferListPtr = UnsafeMutableAudioBufferListPointer(bufferList)
 
@@ -929,7 +1150,18 @@ class RingBuffer {
         }
 
         readIndex = (readIndex + toRead) % capacityFrames
+        storedFrames -= toRead
         return toRead
+    }
+
+    func trimBufferedFrames(maxBufferedFrames: UInt32) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard maxBufferedFrames < storedFrames else { return }
+        let framesToDrop = storedFrames - maxBufferedFrames
+        readIndex = (readIndex + framesToDrop) % capacityFrames
+        storedFrames = maxBufferedFrames
     }
 }
 
