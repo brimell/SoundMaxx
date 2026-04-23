@@ -3,8 +3,21 @@ import AVFoundation
 import CoreAudio
 import AudioToolbox
 import Accelerate
+import os
 
 class AudioEngine: ObservableObject {
+    private struct RealtimeUIState {
+        var eqStagePeakSample: Float = 0.0
+        var eqStagePeakHoldSample: Float = 0.0
+        var eqStageClippingDetected = false
+        var outputLimiterEngaged = false
+        var outputPeakSample: Float = 0.0
+        var outputPeakHoldSample: Float = 0.0
+        var outputStageClippingDetected = false
+        var clippingDetected = false
+        var spectrumBins: [Float] = Array(repeating: 0.0, count: SpectrumAnalyzer.defaultBarCount)
+    }
+
     static let supportedIOBufferFrames: [UInt32] = [64, 128, 256, 512, 1024, 2048, 4096]
     static let defaultIOBufferFrames: UInt32 = 256
     static let defaultRingBufferCapacityMultiplier: UInt32 = 4
@@ -76,6 +89,8 @@ class AudioEngine: ObservableObject {
     private var spectrumAnalyzer: SpectrumAnalyzer?
     private let spectrumPublishInterval: TimeInterval = 1.0 / 30.0
     private var lastSpectrumPublishTime: TimeInterval = 0
+    private let realtimeUIStateLock = OSAllocatedUnfairLock(initialState: RealtimeUIState())
+    private var uiPublishTimer: DispatchSourceTimer?
 
     // Device info
     @Published var outputDeviceNeedsVolumeControl = false
@@ -536,6 +551,7 @@ class AudioEngine: ObservableObject {
 
             isRunning = true
             errorMessage = nil
+            startUIPublishTimer()
 
         } catch {
             errorMessage = "Failed to start: \(error.localizedDescription)"
@@ -864,6 +880,8 @@ class AudioEngine: ObservableObject {
     }
 
     private func cleanup() {
+        stopUIPublishTimer()
+
         if let unit = inputUnit {
             AudioOutputUnitStop(unit)
             AudioComponentInstanceDispose(unit)
@@ -881,6 +899,39 @@ class AudioEngine: ObservableObject {
         releaseInputRenderBuffers()
         resetClippingMeterState()
         resetSpectrumState()
+    }
+
+    private func startUIPublishTimer() {
+        stopUIPublishTimer()
+
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
+        timer.schedule(deadline: .now(), repeating: 1.0 / 30.0)
+        timer.setEventHandler { [weak self] in
+            self?.publishRealtimeStateToUI()
+        }
+        timer.resume()
+        uiPublishTimer = timer
+    }
+
+    private func stopUIPublishTimer() {
+        uiPublishTimer?.cancel()
+        uiPublishTimer = nil
+    }
+
+    private func publishRealtimeStateToUI() {
+        let snapshot = realtimeUIStateLock.withLock { state in
+            state
+        }
+
+        eqStagePeakSample = snapshot.eqStagePeakSample
+        eqStagePeakHoldSample = snapshot.eqStagePeakHoldSample
+        eqStageClippingDetected = snapshot.eqStageClippingDetected
+        outputLimiterEngaged = snapshot.outputLimiterEngaged
+        outputPeakSample = snapshot.outputPeakSample
+        outputPeakHoldSample = snapshot.outputPeakHoldSample
+        outputStageClippingDetected = snapshot.outputStageClippingDetected
+        clippingDetected = snapshot.clippingDetected
+        spectrumBins = snapshot.spectrumBins
     }
 
     // Called when input data is available from BlackHole
@@ -1110,24 +1161,23 @@ class AudioEngine: ObservableObject {
         lastLimiterEngagedState = limiterActive
         lastOutputMeterClippingDetected = outputClippingActive
 
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.eqStagePeakSample = eqStagePeakSample
-            self.eqStagePeakHoldSample = nextEQPeakHoldSample
-            self.eqStageClippingDetected = eqClippingActive
-            self.outputLimiterEngaged = limiterActive
-            self.outputPeakSample = outputStagePeakSample
-            self.outputPeakHoldSample = nextOutputPeakHoldSample
-            self.outputStageClippingDetected = outputClippingActive
-            self.clippingDetected = outputClippingActive
+        realtimeUIStateLock.withLock { state in
+            state.eqStagePeakSample = eqStagePeakSample
+            state.eqStagePeakHoldSample = nextEQPeakHoldSample
+            state.eqStageClippingDetected = eqClippingActive
+            state.outputLimiterEngaged = limiterActive
+            state.outputPeakSample = outputStagePeakSample
+            state.outputPeakHoldSample = nextOutputPeakHoldSample
+            state.outputStageClippingDetected = outputClippingActive
+            state.clippingDetected = outputClippingActive
         }
     }
 
     private func setupSpectrumAnalyzer(sampleRate: Float) {
         spectrumAnalyzer = SpectrumAnalyzer(sampleRate: sampleRate)
         lastSpectrumPublishTime = 0
-        DispatchQueue.main.async { [weak self] in
-            self?.spectrumBins = Array(repeating: 0.0, count: SpectrumAnalyzer.defaultBarCount)
+        realtimeUIStateLock.withLock { state in
+            state.spectrumBins = Array(repeating: 0.0, count: SpectrumAnalyzer.defaultBarCount)
         }
     }
 
@@ -1148,15 +1198,20 @@ class AudioEngine: ObservableObject {
 
         lastSpectrumPublishTime = now
         let bars = analyzer.currentBars
-        DispatchQueue.main.async { [weak self] in
-            self?.spectrumBins = bars
+        realtimeUIStateLock.withLock { state in
+            state.spectrumBins = bars
         }
     }
 
     private func resetSpectrumState() {
         lastSpectrumPublishTime = 0
+        let resetBins = Array(repeating: 0.0, count: SpectrumAnalyzer.defaultBarCount)
+        realtimeUIStateLock.withLock { state in
+            state.spectrumBins = resetBins
+        }
+
         DispatchQueue.main.async { [weak self] in
-            self?.spectrumBins = Array(repeating: 0.0, count: SpectrumAnalyzer.defaultBarCount)
+            self?.spectrumBins = resetBins
         }
     }
 
@@ -1172,6 +1227,17 @@ class AudioEngine: ObservableObject {
         lastEQMeterClippingDetected = false
         lastLimiterEngagedState = false
         lastOutputMeterClippingDetected = false
+
+        realtimeUIStateLock.withLock { state in
+            state.eqStagePeakSample = 0
+            state.eqStagePeakHoldSample = 0
+            state.eqStageClippingDetected = false
+            state.outputLimiterEngaged = false
+            state.outputPeakSample = 0
+            state.outputPeakHoldSample = 0
+            state.outputStageClippingDetected = false
+            state.clippingDetected = false
+        }
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
