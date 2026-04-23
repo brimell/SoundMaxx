@@ -1205,7 +1205,7 @@ class AudioEngine: ObservableObject {
 
     private func resetSpectrumState() {
         lastSpectrumPublishTime = 0
-        let resetBins = Array(repeating: 0.0, count: SpectrumAnalyzer.defaultBarCount)
+        let resetBins = Array(repeating: Float(0), count: SpectrumAnalyzer.defaultBarCount)
         realtimeUIStateLock.withLock { state in
             state.spectrumBins = resetBins
         }
