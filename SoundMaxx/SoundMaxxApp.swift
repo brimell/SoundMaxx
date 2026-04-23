@@ -2,12 +2,79 @@ import SwiftUI
 import AVFoundation
 import CoreAudio
 import Carbon.HIToolbox
+import AppKit
+
+final class CrashRelaunchManager {
+    private let sessionID = UUID().uuidString
+    private var terminationObserver: NSObjectProtocol?
+
+    deinit {
+        if let terminationObserver {
+            NotificationCenter.default.removeObserver(terminationObserver)
+        }
+    }
+
+    func start() {
+        guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else {
+            return
+        }
+
+        let pid = getpid()
+        let markerURL = markerFileURL(forPID: pid)
+        try? FileManager.default.removeItem(at: markerURL)
+
+        terminationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: nil
+        ) { _ in
+            FileManager.default.createFile(atPath: markerURL.path, contents: Data(), attributes: nil)
+        }
+
+        let appPath = Bundle.main.bundlePath
+        let script = """
+        pid=\(pid)
+        marker='\(singleQuoteEscaped(markerURL.path))'
+        app='\(singleQuoteEscaped(appPath))'
+
+        while kill -0 "$pid" 2>/dev/null; do
+          sleep 1
+        done
+
+        if [ -f "$marker" ]; then
+          rm -f "$marker"
+          exit 0
+        fi
+
+        open -n "$app" --args --watchdog-relaunch
+        """
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", script]
+        process.standardInput = nil
+        process.standardOutput = nil
+        process.standardError = nil
+
+        try? process.run()
+    }
+
+    private func markerFileURL(forPID pid: pid_t) -> URL {
+        let fileName = "soundmaxx-graceful-exit-\(pid)-\(sessionID).flag"
+        return FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+    }
+
+    private func singleQuoteEscaped(_ value: String) -> String {
+        value.replacingOccurrences(of: "'", with: "'\\''")
+    }
+}
 
 @main
 struct SoundMaxxApp: App {
     @StateObject private var audioEngine: AudioEngine
     @StateObject private var eqModel: EQModel
     @StateObject private var updateChecker: UpdateChecker
+    private let crashRelaunchManager: CrashRelaunchManager
     private let outputSwitchShortcutManager: OutputSwitchShortcutManager
     private let trayController: TrayController
 
@@ -22,9 +89,11 @@ struct SoundMaxxApp: App {
         _audioEngine = StateObject(wrappedValue: engine)
         _eqModel = StateObject(wrappedValue: model)
         _updateChecker = StateObject(wrappedValue: checker)
+        crashRelaunchManager = CrashRelaunchManager()
         outputSwitchShortcutManager = shortcutManager
         trayController = TrayController(audioEngine: engine, eqModel: model, updateChecker: checker)
 
+        crashRelaunchManager.start()
         Self.configureEngineCallbacks(audioEngine: engine, eqModel: model)
         Self.requestMicrophonePermissionAndStart(audioEngine: engine, eqModel: model)
     }
