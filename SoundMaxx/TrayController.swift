@@ -36,11 +36,15 @@ final class TrayController: NSObject {
         .environmentObject(audioEngine)
         .environmentObject(eqModel)
         .environmentObject(updateChecker)
+        // Force active appearance so controls never dim when another app is in focus
+        .environment(\.controlActiveState, .active)
 
         let controller = NSHostingController(rootView: rootView)
         popover = NSPopover()
         popover.contentViewController = controller
-        popover.behavior = .transient
+        // applicationDefined: we control open/close exclusively — no macOS auto-dismiss
+        // that would race with our button action and cause the re-open loop
+        popover.behavior = .applicationDefined
         popover.animates = false
     }
 
