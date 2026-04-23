@@ -20,6 +20,9 @@ struct AppSettings: Codable {
     var selectedOutputDeviceID: Int32? = nil
     var shortcutOutputDeviceUIDs: [String]? = nil
     var normalizeSpectrumAnalyzer: Bool = false
+    var preferredIOBufferFrames: Int32 = Int32(AudioEngine.defaultIOBufferFrames)
+    var ringBufferCapacityMultiplier: Int32 = Int32(AudioEngine.defaultRingBufferCapacityMultiplier)
+    var latencyTargetMultiplier: Int32 = Int32(AudioEngine.defaultLatencyTargetMultiplier)
 
     enum CodingKeys: String, CodingKey {
         case parametricBands
@@ -39,6 +42,9 @@ struct AppSettings: Codable {
         case selectedOutputDeviceID
         case shortcutOutputDeviceUIDs
         case normalizeSpectrumAnalyzer
+        case preferredIOBufferFrames
+        case ringBufferCapacityMultiplier
+        case latencyTargetMultiplier
     }
 
     init() {}
@@ -63,6 +69,9 @@ struct AppSettings: Codable {
         selectedOutputDeviceID = try container.decodeIfPresent(Int32.self, forKey: .selectedOutputDeviceID)
         shortcutOutputDeviceUIDs = try container.decodeIfPresent([String].self, forKey: .shortcutOutputDeviceUIDs)
         normalizeSpectrumAnalyzer = try container.decodeIfPresent(Bool.self, forKey: .normalizeSpectrumAnalyzer) ?? false
+        preferredIOBufferFrames = try container.decodeIfPresent(Int32.self, forKey: .preferredIOBufferFrames) ?? Int32(AudioEngine.defaultIOBufferFrames)
+        ringBufferCapacityMultiplier = try container.decodeIfPresent(Int32.self, forKey: .ringBufferCapacityMultiplier) ?? Int32(AudioEngine.defaultRingBufferCapacityMultiplier)
+        latencyTargetMultiplier = try container.decodeIfPresent(Int32.self, forKey: .latencyTargetMultiplier) ?? Int32(AudioEngine.defaultLatencyTargetMultiplier)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -85,6 +94,9 @@ struct AppSettings: Codable {
         try container.encode(selectedOutputDeviceID, forKey: .selectedOutputDeviceID)
         try container.encode(shortcutOutputDeviceUIDs, forKey: .shortcutOutputDeviceUIDs)
         try container.encode(normalizeSpectrumAnalyzer, forKey: .normalizeSpectrumAnalyzer)
+        try container.encode(preferredIOBufferFrames, forKey: .preferredIOBufferFrames)
+        try container.encode(ringBufferCapacityMultiplier, forKey: .ringBufferCapacityMultiplier)
+        try container.encode(latencyTargetMultiplier, forKey: .latencyTargetMultiplier)
     }
 }
 

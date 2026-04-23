@@ -33,6 +33,9 @@ struct ContentView: View {
     @State private var newPresetName = ""
     @State private var didInitialStartup = false
     @State private var normalizeSpectrumAnalyzer = false
+    @State private var preferredIOBufferFrames: UInt32 = AudioEngine.defaultIOBufferFrames
+    @State private var ringBufferCapacityMultiplier: UInt32 = AudioEngine.defaultRingBufferCapacityMultiplier
+    @State private var latencyTargetMultiplier: UInt32 = AudioEngine.defaultLatencyTargetMultiplier
     @StateObject private var launchAtLogin = LaunchAtLogin()
     private let settingsStore = AppSettingsStore.shared
     private let autoEQManager = AutoEQManager.shared
@@ -93,6 +96,7 @@ struct ContentView: View {
         .onAppear {
             loadShortcutOutputTargets()
             loadSpectrumAnalyzerSettings()
+            loadLatencySettings()
             setupDeviceChangeCallback()
             eqModel.resolvePresetSelection(using: presetManager.customPresets)
             syncEQToEngine()
@@ -103,6 +107,21 @@ struct ContentView: View {
         }
         .onChange(of: normalizeSpectrumAnalyzer) { _ in
             persistSpectrumAnalyzerSettings()
+        }
+        .onChange(of: preferredIOBufferFrames) { _ in
+            applyLatencySettingsToEngine()
+            persistLatencySettings()
+        }
+        .onChange(of: ringBufferCapacityMultiplier) { _ in
+            if latencyTargetMultiplier > ringBufferCapacityMultiplier {
+                latencyTargetMultiplier = ringBufferCapacityMultiplier
+            }
+            applyLatencySettingsToEngine()
+            persistLatencySettings()
+        }
+        .onChange(of: latencyTargetMultiplier) { _ in
+            applyLatencySettingsToEngine()
+            persistLatencySettings()
         }
         .onReceive(audioEngine.$selectedInputDeviceID) { newDeviceID in
             if selectedInputID != newDeviceID {
@@ -1033,6 +1052,8 @@ struct ContentView: View {
                 deviceProfileControls
             }
 
+            latencyControls
+
             HStack {
                 Button {
                     exportSettingsBackup()
@@ -1117,6 +1138,65 @@ struct ContentView: View {
 
                 Spacer()
             }
+        }
+    }
+
+    private var latencyControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Latency")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.secondary)
+
+            HStack {
+                Text("I/O Buffer")
+                    .foregroundColor(.secondary)
+                    .frame(width: 110, alignment: .leading)
+
+                Picker(
+                    "",
+                    selection: $preferredIOBufferFrames
+                ) {
+                    ForEach(AudioEngine.supportedIOBufferFrames, id: \.self) { frames in
+                        Text("\(frames) frames").tag(frames)
+                    }
+                }
+                .labelsHidden()
+                .help("Lower values reduce latency but can crackle on slower systems.")
+
+                Spacer()
+            }
+
+            HStack {
+                Text("Ring Capacity")
+                    .foregroundColor(.secondary)
+                    .frame(width: 110, alignment: .leading)
+
+                Stepper(value: $ringBufferCapacityMultiplier, in: 1...16) {
+                    Text("\(ringBufferCapacityMultiplier)x")
+                        .frame(width: 50, alignment: .leading)
+                }
+                .help("Total buffering available before overflow. Lower reduces latency growth.")
+
+                Spacer()
+            }
+
+            HStack {
+                Text("Target Queue")
+                    .foregroundColor(.secondary)
+                    .frame(width: 110, alignment: .leading)
+
+                Stepper(value: $latencyTargetMultiplier, in: 1...ringBufferCapacityMultiplier) {
+                    Text("\(latencyTargetMultiplier)x")
+                        .frame(width: 50, alignment: .leading)
+                }
+                .help("Keeps queue near this depth by dropping older buffered frames to avoid A/V drift.")
+
+                Spacer()
+            }
+
+            Text("Effective: in \(audioEngine.effectiveInputBufferFrames)f, out \(audioEngine.effectiveOutputBufferFrames)f, ring \(audioEngine.effectiveRingBufferCapacityFrames)f")
+                .font(.caption2)
+                .foregroundColor(.secondary)
         }
     }
 
@@ -1335,6 +1415,7 @@ struct ContentView: View {
         audioEngine.setLimiterCeilingDB(eqModel.limiterCeilingDB)
         audioEngine.setAutoStopClippingEnabled(eqModel.autoStopClippingEnabled)
         audioEngine.setVolume(eqModel.volume)
+        applyLatencySettingsToEngine()
     }
 
     private func bandFrequencyLabel(_ index: Int) -> String {
@@ -1548,9 +1629,35 @@ struct ContentView: View {
         normalizeSpectrumAnalyzer = settingsStore.load()?.normalizeSpectrumAnalyzer ?? false
     }
 
+    private func loadLatencySettings() {
+        let settings = settingsStore.load()
+        preferredIOBufferFrames = UInt32(max(16, settings?.preferredIOBufferFrames ?? Int32(AudioEngine.defaultIOBufferFrames)))
+        ringBufferCapacityMultiplier = UInt32(max(1, settings?.ringBufferCapacityMultiplier ?? Int32(AudioEngine.defaultRingBufferCapacityMultiplier)))
+        latencyTargetMultiplier = UInt32(max(1, settings?.latencyTargetMultiplier ?? Int32(AudioEngine.defaultLatencyTargetMultiplier)))
+        if latencyTargetMultiplier > ringBufferCapacityMultiplier {
+            latencyTargetMultiplier = ringBufferCapacityMultiplier
+        }
+    }
+
     private func persistSpectrumAnalyzerSettings() {
         settingsStore.update { settings in
             settings.normalizeSpectrumAnalyzer = normalizeSpectrumAnalyzer
+        }
+    }
+
+    private func applyLatencySettingsToEngine() {
+        audioEngine.updateLatencySettings(
+            ioBufferFrames: preferredIOBufferFrames,
+            ringCapacityMultiplier: ringBufferCapacityMultiplier,
+            latencyTargetMultiplier: latencyTargetMultiplier
+        )
+    }
+
+    private func persistLatencySettings() {
+        settingsStore.update { settings in
+            settings.preferredIOBufferFrames = Int32(preferredIOBufferFrames)
+            settings.ringBufferCapacityMultiplier = Int32(ringBufferCapacityMultiplier)
+            settings.latencyTargetMultiplier = Int32(latencyTargetMultiplier)
         }
     }
 

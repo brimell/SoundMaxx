@@ -76,6 +76,12 @@ struct SoundMaxxApp: App {
         applyEQModelToAudioEngine(audioEngine: audioEngine, eqModel: eqModel)
 
         if let settings = settingsStore.load() {
+            audioEngine.updateLatencySettings(
+                ioBufferFrames: UInt32(max(16, settings.preferredIOBufferFrames)),
+                ringCapacityMultiplier: UInt32(max(1, settings.ringBufferCapacityMultiplier)),
+                latencyTargetMultiplier: UInt32(max(1, settings.latencyTargetMultiplier))
+            )
+
             if let savedInputID = settings.selectedInputDeviceID {
                 let inputID = AudioDeviceID(savedInputID)
                 if deviceManager.inputDevices.contains(where: { $0.id == inputID }) {
