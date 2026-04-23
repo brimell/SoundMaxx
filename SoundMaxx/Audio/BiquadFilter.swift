@@ -178,6 +178,7 @@ class BiquadFilter {
 /// Multi-band parametric EQ using biquad filters
 class ParametricEQ {
     private var filters: [BiquadFilter] = []
+    private var enabledFilters: [BiquadFilter] = []
     private var activeBands: [EQBand] = []
     private var pendingBands: [EQBand]?
     private var filtersEnabled = true
@@ -233,14 +234,16 @@ class ParametricEQ {
 
         applyPendingUpdatesIfNeeded()
 
+        if !filtersEnabled {
+            return
+        }
+
         for frame in 0..<frameCount {
             var sample = buffer[frame] * preGainLinear
 
-            if filtersEnabled {
-                // Apply each enabled filter in series.
-                for (filter, band) in zip(filters, activeBands) where band.isEnabled {
-                    sample = filter.process(sample: sample, channel: channel)
-                }
+            // Apply each enabled filter in series.
+            for filter in enabledFilters {
+                sample = filter.process(sample: sample, channel: channel)
             }
 
             buffer[frame] = sample
@@ -265,6 +268,7 @@ class ParametricEQ {
 
         if let nextFiltersEnabled {
             filtersEnabled = nextFiltersEnabled
+            rebuildEnabledFilters()
         }
 
         if let nextPreGainDB {
@@ -274,6 +278,22 @@ class ParametricEQ {
 
         guard let nextBands else { return }
         applyBandsImmediately(nextBands)
+    }
+
+    private func rebuildEnabledFilters() {
+        guard filtersEnabled else {
+            enabledFilters = []
+            return
+        }
+
+        var updatedEnabledFilters: [BiquadFilter] = []
+        updatedEnabledFilters.reserveCapacity(filters.count)
+
+        for index in activeBands.indices where activeBands[index].isEnabled {
+            updatedEnabledFilters.append(filters[index])
+        }
+
+        enabledFilters = updatedEnabledFilters
     }
 
     private func applyBandsImmediately(_ bands: [EQBand]) {
@@ -291,6 +311,8 @@ class ParametricEQ {
         for index in activeBands.indices {
             filters[index].configure(with: activeBands[index], sampleRate: sampleRate)
         }
+
+        rebuildEnabledFilters()
     }
 }
 

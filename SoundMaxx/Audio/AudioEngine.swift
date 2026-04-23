@@ -22,6 +22,7 @@ class AudioEngine: ObservableObject {
     private var requestedIOBufferFrames: UInt32 = AudioEngine.defaultIOBufferFrames
     private var ringBufferCapacityMultiplier: UInt32 = AudioEngine.defaultRingBufferCapacityMultiplier
     private var latencyTargetMultiplier: UInt32 = AudioEngine.defaultLatencyTargetMultiplier
+    private let deviceManager = AudioDeviceManager()
     private var currentBands: [EQBand] = EQBand.defaultTenBand
     private var currentBypassState = false
     private var currentEQFiltersEnabled = true
@@ -39,6 +40,7 @@ class AudioEngine: ObservableObject {
     @Published var softwareVolume: Float = 1.0
     @Published var preGain: Float = 0.0
     @Published var outputGain: Float = 0.0
+    private var outputGainLinear: Float = 1.0
     @Published var limiterEnabled: Bool = false
     @Published var limiterCeilingDB: Float = -1.0
     @Published var autoStopClippingEnabled: Bool = false
@@ -150,6 +152,7 @@ class AudioEngine: ObservableObject {
 
     func setOutputGain(_ gain: Float) {
         outputGain = max(-40.0, min(40.0, gain))
+        outputGainLinear = powf(10.0, outputGain / 20.0)
     }
 
     func setLimiterEnabled(_ enabled: Bool) {
@@ -345,7 +348,7 @@ class AudioEngine: ObservableObject {
     }
 
     private func enforceBlackHoleAsDefaultOutput() {
-        let deviceManager = AudioDeviceManager()
+        deviceManager.refreshDevices()
         guard let blackHoleOutput = deviceManager.outputDevices.first(where: { $0.name.lowercased().contains("blackhole") }) else {
             return
         }
@@ -397,7 +400,7 @@ class AudioEngine: ObservableObject {
     private func handleOutputDeviceListChanged() {
         guard let selectedOutputDeviceID else { return }
 
-        let deviceManager = AudioDeviceManager()
+        deviceManager.refreshDevices()
         let outputStillConnected = deviceManager.outputDevices.contains { $0.id == selectedOutputDeviceID }
         guard !outputStillConnected else { return }
 
@@ -917,6 +920,7 @@ class AudioEngine: ObservableObject {
         ioData: UnsafeMutablePointer<AudioBufferList>?
     ) -> OSStatus {
         guard let ioData = ioData, let ringBuffer = ringBuffer else { return noErr }
+        let frameCount = Int(inNumberFrames)
 
         let desiredLatencyFrames = max(effectiveOutputBufferFrames * latencyTargetMultiplier, effectiveOutputBufferFrames)
         ringBuffer.trimBufferedFrames(maxBufferedFrames: desiredLatencyFrames + inNumberFrames)
@@ -941,27 +945,32 @@ class AudioEngine: ObservableObject {
             let bufferListPtr = UnsafeMutableAudioBufferListPointer(ioData)
             for (channelIndex, buffer) in bufferListPtr.enumerated() where channelIndex < 2 {
                 guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
-                eq.process(buffer: data, frameCount: Int(inNumberFrames), channel: channelIndex)
+                eq.process(buffer: data, frameCount: frameCount, channel: channelIndex)
             }
         }
 
         let bufferListPtr = UnsafeMutableAudioBufferListPointer(ioData)
+        let processingEnabled = !currentBypassState
+        let applyOutputGain = processingEnabled && fabsf(outputGainLinear - 1.0) > 0.0001
 
-        // Meter the EQ stage before post-gain and limiter.
+        // Meter EQ stage and apply post-EQ output gain in one pass.
         var eqStagePeak: Float = 0.0
         for buffer in bufferListPtr {
             guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
-            for i in 0..<Int(inNumberFrames) {
-                let absSample = fabsf(data[i])
+            for i in 0..<frameCount {
+                let sample = data[i]
+                let absSample = fabsf(sample)
                 if absSample > eqStagePeak {
                     eqStagePeak = absSample
+                }
+                if applyOutputGain {
+                    data[i] = sample * outputGainLinear
                 }
             }
         }
 
         // Auto-stop clipping is a headroom guard for the EQ stage.
         let autoStopEnabled = autoStopClippingRuntimeEnabled
-        let processingEnabled = !currentBypassState
         if autoStopEnabled && processingEnabled {
             reducePreGainIfClipping(eqStagePeak)
         }
@@ -969,22 +978,11 @@ class AudioEngine: ObservableObject {
         // Spectrum intentionally taps the post-EQ signal so frequency changes track EQ moves.
         processSpectrum(bufferList: bufferListPtr, frameCount: Int(inNumberFrames))
 
-        // Apply post-EQ output gain.
-        let outputGainLinear = powf(10.0, outputGain / 20.0)
-        if processingEnabled && fabsf(outputGainLinear - 1.0) > 0.0001 {
-            for buffer in bufferListPtr {
-                guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
-                for i in 0..<Int(inNumberFrames) {
-                    data[i] *= outputGainLinear
-                }
-            }
-        }
-
         // Apply final limiter / clip guard.
         var limiterEngagedInBlock = false
         if processingEnabled, limiterEnabled, let limiter = outputLimiter {
             limiter.setCeilingDB(limiterCeilingDB)
-            limiterEngagedInBlock = applyLimiter(limiter, to: ioData, frameCount: Int(inNumberFrames))
+            limiterEngagedInBlock = applyLimiter(limiter, to: ioData, frameCount: frameCount)
         }
 
         // Apply final software volume (mainly for outputs without hardware volume control).
@@ -992,7 +990,7 @@ class AudioEngine: ObservableObject {
         var outputStagePeak: Float = 0.0
         for buffer in bufferListPtr {
             guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
-            for i in 0..<Int(inNumberFrames) {
+            for i in 0..<frameCount {
                 if volume < 1.0 {
                     data[i] *= volume
                 }
@@ -1210,18 +1208,38 @@ class RingBuffer {
         buffer.deallocate()
     }
 
+    private func channelBase(_ channelIndex: Int) -> Int {
+        channelIndex * Int(capacityFrames)
+    }
+
     func store(_ bufferList: UnsafeMutablePointer<AudioBufferList>, frameCount: UInt32) {
         lock.lock()
         defer { lock.unlock() }
 
         let bufferListPtr = UnsafeMutableAudioBufferListPointer(bufferList)
+        let frameCountInt = Int(frameCount)
+        let firstChunk = min(frameCount, capacityFrames - writeIndex)
+        let firstChunkInt = Int(firstChunk)
+        let secondChunkInt = frameCountInt - firstChunkInt
 
-        for frame in 0..<frameCount {
-            for (channelIndex, audioBuffer) in bufferListPtr.enumerated() where channelIndex < Int(channels) {
-                if let data = audioBuffer.mData?.assumingMemoryBound(to: Float.self) {
-                    let destIndex = Int((writeIndex + frame) % capacityFrames) * Int(channels) + channelIndex
-                    buffer[destIndex] = data[Int(frame)]
-                }
+        for (channelIndex, audioBuffer) in bufferListPtr.enumerated() where channelIndex < Int(channels) {
+            guard let data = audioBuffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
+
+            let base = channelBase(channelIndex)
+            let destination = buffer.advanced(by: base)
+
+            memcpy(
+                destination.advanced(by: Int(writeIndex)),
+                data,
+                firstChunkInt * MemoryLayout<Float>.size
+            )
+
+            if secondChunkInt > 0 {
+                memcpy(
+                    destination,
+                    data.advanced(by: firstChunkInt),
+                    secondChunkInt * MemoryLayout<Float>.size
+                )
             }
         }
 
@@ -1241,13 +1259,29 @@ class RingBuffer {
         let toRead = min(frameCount, storedFrames)
 
         let bufferListPtr = UnsafeMutableAudioBufferListPointer(bufferList)
+        let toReadInt = Int(toRead)
+        let firstChunk = min(toRead, capacityFrames - readIndex)
+        let firstChunkInt = Int(firstChunk)
+        let secondChunkInt = toReadInt - firstChunkInt
 
-        for frame in 0..<toRead {
-            for (channelIndex, audioBuffer) in bufferListPtr.enumerated() where channelIndex < Int(channels) {
-                if let data = audioBuffer.mData?.assumingMemoryBound(to: Float.self) {
-                    let srcIndex = Int((readIndex + frame) % capacityFrames) * Int(channels) + channelIndex
-                    data[Int(frame)] = buffer[srcIndex]
-                }
+        for (channelIndex, audioBuffer) in bufferListPtr.enumerated() where channelIndex < Int(channels) {
+            guard let data = audioBuffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
+
+            let base = channelBase(channelIndex)
+            let source = buffer.advanced(by: base)
+
+            memcpy(
+                data,
+                source.advanced(by: Int(readIndex)),
+                firstChunkInt * MemoryLayout<Float>.size
+            )
+
+            if secondChunkInt > 0 {
+                memcpy(
+                    data.advanced(by: firstChunkInt),
+                    source,
+                    secondChunkInt * MemoryLayout<Float>.size
+                )
             }
         }
 
